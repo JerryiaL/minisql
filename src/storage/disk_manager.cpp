@@ -5,6 +5,8 @@
 #include "page/bitmap_page.h"
 #include "storage/disk_manager.h"
 
+DiskFileMetaPage A;
+BitmapPage B;
 DiskManager::DiskManager(const std::string &db_file) : file_name_(db_file) {
   std::scoped_lock<std::recursive_mutex> lock(db_io_latch_);
   db_io_.open(db_file, std::ios::binary | std::ios::in | std::ios::out);
@@ -42,19 +44,57 @@ void DiskManager::WritePage(page_id_t logical_page_id, const char *page_data) {
 }
 
 page_id_t DiskManager::AllocatePage() {
-  ASSERT(false, "Not implemented yet.");
-  return INVALID_PAGE_ID;
+  page_id_t logical_id = 0;
+  while(!IsPageFree(logical_id) && MapPageId(logical_page_id)*PAGE_SIZE < GetFileSize(file_name_)){
+    logical_id++;
+  }
+  if(MapPageId(logical_page_id)*PAGE_SIZE >= GetFileSize(file_name_)){
+    ASSERT(false, "Not implemented yet.");
+    return INVALID_PAGE_ID;
+  }
+
+  return logical_id;
 }
 
 void DiskManager::DeAllocatePage(page_id_t logical_page_id) {
-  ASSERT(false, "Not implemented yet.");
+  page_id_t physical_page_id = MapPageId(logical_page_id);  
+  bool j = (physical_page_id*PAGE_SIZE >= GetFileSize(file_name_));
+  ASSERT(j, "Not implemented yet.");
+  char * page_data[PAGE_SIZE];
+  memset(page_data, 0, PAGE_SIZE);
+  WritePhysicalPage(physical_page_id,page_data);
 }
 
 bool DiskManager::IsPageFree(page_id_t logical_page_id) {
+  uint32_t extent_id = 1,index = logical_page_id+1;
+  uint32_t extent_pages;
+  uint32_t n = A.GetExtentNums();
+  while(extent_id <= n){
+    extent_pages = A.GetExtentUsedPage(extent_id);
+    if(index <= extent_pages){
+      return(B.IsPageFree(index-1));
+    }
+    extent_id++;
+    index -= extent_pages;
+  }
   return false;
 }
 
 page_id_t DiskManager::MapPageId(page_id_t logical_page_id) {
+  page_id_t physical_page_id = 0,logical_id = 0;
+  uint32_t num_extent = A.GetExtentNums();
+  uint32_t extent_id = 1;
+  uint32_t extent_pages;
+  while(extent_id <= num_extent){
+    physical_page_id++;
+    extent_pages = A.GetExtentUsedPage(extent_id);
+    for(uint32_t i = 0 ; i < extent_pages ; i++){
+      physical_page_id++;
+      if(logical_id == logical_page_id) return physical_page_id;
+      logical_id++;
+    }
+    extent_id++;
+  }
   return 0;
 }
 
