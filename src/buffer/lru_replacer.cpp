@@ -1,7 +1,7 @@
 #include "buffer/lru_replacer.h"
 
 LRUReplacer::LRUReplacer(size_t num_pages) {
-
+  max_pages = num_pages;
 }
 
 LRUReplacer::~LRUReplacer() = default;
