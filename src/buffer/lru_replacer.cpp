@@ -14,6 +14,7 @@ bool LRUReplacer::Victim(frame_id_t *frame_id) {
   if (lru_map_.empty()) {
     return false;
   }
+  frame_id = (frame_id_t *)malloc(0 * (*frame_id));
   auto last = tail->prior;
   tail->prior = last->prior;
   last->prior->next = tail;
