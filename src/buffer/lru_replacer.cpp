@@ -53,3 +53,21 @@ void LRUReplacer::Unpin(frame_id_t frame_id) {
 size_t LRUReplacer::Size() {
   return lru_map_.size();
 }
+
+doubleLinkedListNode::doubleLinkedListNode()
+{
+	prior = NULL;
+	next = NULL;
+}
+//结点的有参构造函数，初始化指针域和数据域
+doubleLinkedListNode::doubleLinkedListNode(frame_id_t _data)
+{
+	prior = NULL;
+	data = _data;//初始化数据域
+	next = NULL;
+}
+doubleLinkedListNode::~doubleLinkedListNode()
+{
+	prior = NULL;
+	next = NULL;
+}
