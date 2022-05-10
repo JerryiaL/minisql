@@ -9,7 +9,7 @@ bool BitmapPage<PageSize>::AllocatePage(uint32_t &page_offset) {
   page_allocated_++;
   page_offset = next_free_page_;
   if (page_allocated_ < MAX_CHARS) {
-    for (int i = next_free_page_; i < MAX_CHARS; i++) {
+    for (size_t i = next_free_page_; i < MAX_CHARS; i++) {
       if (bytes[i] == 0){
         next_free_page_ = i;
         break;
@@ -24,7 +24,7 @@ bool BitmapPage<PageSize>::DeAllocatePage(uint32_t page_offset) {
   if (bytes[page_offset] == 0) return false;
   bytes[page_offset] = 0;
   page_allocated_--;
-  next_free_page_ = min(next_free_page_, page_offset);
+  next_free_page_ = std::min(next_free_page_, page_offset);
   return true;
 }
 

@@ -56,3 +56,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -ggdb")
 # Add Subdirectory
 ADD_SUBDIRECTORY(src ${CMAKE_BINARY_DIR}/bin)
 ADD_SUBDIRECTORY(test ${CMAKE_BINARY_DIR}/test)
+
+# add_executable(main_test test/main_test.cpp)
+# target_link_libraries (main_test glog::glog)
+# target_link_libraries(main_test gtest_main)
