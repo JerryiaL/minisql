@@ -71,12 +71,16 @@ private:
 };
 
 class doubleLinkedListNode{
-public:
-  doubleLinkedListNode* prior;
-  doubleLinkedListNode* next;
-  frame_id_t data;
-  doubleLinkedListNode();
-  doubleLinkedListNode(frame_id_t frame_id);
+  public:
+    doubleLinkedListNode();
+    doubleLinkedListNode(frame_id_t frame_id);
+    ~doubleLinkedListNode();
+    friend class LRUReplacer;
+
+  private:
+    doubleLinkedListNode* prior;
+    doubleLinkedListNode* next;
+    frame_id_t data;
 };
 
 #endif  // MINISQL_LRU_REPLACER_H
