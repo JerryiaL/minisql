@@ -79,8 +79,6 @@ private:
   std::unordered_map<frame_id_t, doubleLinkedListNode*> lru_map_;
 };
 
-<<<<<<< HEAD
-=======
 class doubleLinkedListNode{
   public:
     doubleLinkedListNode();
@@ -94,5 +92,4 @@ class doubleLinkedListNode{
     frame_id_t data;
 };
 
->>>>>>> 639520b3f9f898424d428be84b98f2b6cdf4a25a
 #endif  // MINISQL_LRU_REPLACER_H
