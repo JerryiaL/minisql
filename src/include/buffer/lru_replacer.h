@@ -12,6 +12,15 @@
 
 using namespace std;
 
+class doubleLinkedListNode{
+public:
+  doubleLinkedListNode* prior;
+  doubleLinkedListNode* next;
+  frame_id_t data;
+  doubleLinkedListNode();
+  doubleLinkedListNode(frame_id_t frame_id);
+};
+
 /**
  * @brief LRUReplacer implements the Least Recently Used replacement policy.
  */
@@ -68,15 +77,6 @@ private:
   doubleLinkedListNode* head;
   doubleLinkedListNode* tail;
   std::unordered_map<frame_id_t, doubleLinkedListNode*> lru_map_;
-};
-
-class doubleLinkedListNode{
-public:
-  doubleLinkedListNode* prior;
-  doubleLinkedListNode* next;
-  frame_id_t data;
-  doubleLinkedListNode();
-  doubleLinkedListNode(frame_id_t frame_id);
 };
 
 #endif  // MINISQL_LRU_REPLACER_H
