@@ -5,6 +5,7 @@
 #include <mutex>
 #include <unordered_set>
 #include <vector>
+#include <unordered_map>
 
 #include "buffer/replacer.h"
 #include "common/config.h"
@@ -64,7 +65,18 @@ public:
 private:
   // add your own private member variables here
   size_t max_pages;
+  doubleLinkedListNode* head;
+  doubleLinkedListNode* tail;
+  std::unordered_map<frame_id_t, doubleLinkedListNode*> lru_map_;
+};
 
+class doubleLinkedListNode{
+public:
+  doubleLinkedListNode* prior;
+  doubleLinkedListNode* next;
+  frame_id_t data;
+  doubleLinkedListNode();
+  doubleLinkedListNode(frame_id_t frame_id);
 };
 
 #endif  // MINISQL_LRU_REPLACER_H
