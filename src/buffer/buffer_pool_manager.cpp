@@ -80,3 +80,7 @@ bool BufferPoolManager::CheckAllUnpinned() {
   }
   return res;
 }
+
+bool BufferPoolManager::FlushAllPages() {
+  return false;
+}
