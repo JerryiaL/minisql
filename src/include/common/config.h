@@ -5,7 +5,7 @@
 #include <cstring>
 
 static constexpr int INVALID_PAGE_ID = -1;           // invalid page id
-static constexpr int INVALID_FRAME_ID = -1;          // invalid transaction id
+static constexpr int INVALID_FRAME_ID = -1;          // invalid frame id
 static constexpr int INVALID_TXN_ID = -1;            // invalid transaction id
 static constexpr int INVALID_LSN = -1;               // invalid log sequence number
 
