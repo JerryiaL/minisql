@@ -12,13 +12,15 @@
 
 using namespace std;
 
-class doubleLinkedListNode{
+/**
+ * @brief Data type of the nodes in lru_list_, which store the unpinned pages
+ */
+class doubleLinkedListNode {
+  friend class LRUReplacer;
   public:
     doubleLinkedListNode();
     doubleLinkedListNode(frame_id_t frame_id);
     ~doubleLinkedListNode();
-    friend class LRUReplacer;
-
   private:
     doubleLinkedListNode* prior;
     doubleLinkedListNode* next;

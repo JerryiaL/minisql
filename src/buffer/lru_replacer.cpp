@@ -38,6 +38,7 @@ void LRUReplacer::Unpin(frame_id_t frame_id) {
     auto cur = lru_map_[frame_id];
     cur->prior->next = cur->next;
     cur->next->prior = cur->prior;
+    printf("frame_id: %d, Already Unpinned\n", frame_id);
   } else {
     cur = new doubleLinkedListNode(frame_id);
   }

@@ -19,8 +19,8 @@ public:
   ~BufferPoolManager();
 
   /**
-   * @brief 根据逻辑页号获取对应的数据页，如果该数据页不在内存中，则需要从磁盘中进行读取
-   * 如果空闲页列表（free_list_）中没有可用的页面并且没有可以被替换的数据页，则应返回 nullptr。
+   * @brief 根据逻辑页号(page_id)获取对应的数据页，如果该数据页不在内存(buffer pool)中，则需要从disk读取到buffer pool
+   * 如果buffer pool已满：空闲页列表(free_list_)中没有可用的页面并且没有可以被替换的数据页，则应返回 nullptr。
    * 
    * @param page_id 
    * @return Page* 
@@ -63,6 +63,7 @@ public:
 
   /**
    * @brief 将所有的页面都转储到磁盘中
+   * @warning Unused
    */
   bool FlushAllPages();
 
@@ -80,9 +81,9 @@ private:
 
 private:
   size_t pool_size_;                                        // number of pages in buffer pool
-  Page *pages_;                                             // array of pages
+  Page *pages_;                                             // buffer pool: array of pages - frame_id is index in pages_
   DiskManager *disk_manager_;                               // pointer to the disk manager.
-  std::unordered_map<page_id_t, frame_id_t> page_table_;    // to keep track of pages
+  std::unordered_map<page_id_t, frame_id_t> page_table_;    // to keep track of pages，所有 pinned frame 索引和 unpinned frame 的索引保存在 page_table_ 中，并通过 page 中 pin_count_ 字段来区分两个状态。
   Replacer *replacer_;                                      // to find an unpinned page for replacement
   std::list<frame_id_t> free_list_;                         // to find a free page for replacement
   recursive_mutex latch_;                                   // to protect shared data structure
