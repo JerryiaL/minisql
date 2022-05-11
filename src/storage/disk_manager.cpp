@@ -6,7 +6,8 @@
 #include "storage/disk_manager.h"
 
 DiskFileMetaPage A;
-BitmapPage B;
+BitmapPage<PAGE_SIZE> B[PAGE_SIZE*8];
+
 DiskManager::DiskManager(const std::string &db_file) : file_name_(db_file) {
   std::scoped_lock<std::recursive_mutex> lock(db_io_latch_);
   db_io_.open(db_file, std::ios::binary | std::ios::in | std::ios::out);
@@ -24,6 +25,7 @@ DiskManager::DiskManager(const std::string &db_file) : file_name_(db_file) {
   }
   ReadPhysicalPage(META_PAGE_ID, meta_data_);
 }
+
 
 void DiskManager::Close() {
   std::scoped_lock<std::recursive_mutex> lock(db_io_latch_);
@@ -45,37 +47,68 @@ void DiskManager::WritePage(page_id_t logical_page_id, const char *page_data) {
 
 page_id_t DiskManager::AllocatePage() {
   page_id_t logical_id = 0;
-  while(!IsPageFree(logical_id) && MapPageId(logical_page_id)*PAGE_SIZE < GetFileSize(file_name_)){
+  while(!IsPageFree(logical_id) && (MapPageId(logical_id)+1)*PAGE_SIZE < GetFileSize(file_name_)){
     logical_id++;
   }
-  if(MapPageId(logical_page_id)*PAGE_SIZE >= GetFileSize(file_name_)){
+  if((MapPageId(logical_id)+1)*PAGE_SIZE >= GetFileSize(file_name_)){
     ASSERT(false, "Not implemented yet.");
-    return INVALID_PAGE_ID;
+    //return INVALID_PAGE_ID;
   }
-
-  return logical_id;
+  uint32_t extent_id = 1,index = logical_id + 1;
+  uint32_t extent_pages = 0,before_pages = 0;
+  uint32_t n = A.GetExtentNums();
+  while(extent_id <= n){
+    before_pages = extent_pages;
+    extent_pages += A.GetExtentUsedPage(extent_id) - 1;
+    if(index <= extent_pages){
+      index -= before_pages - 1;
+      B[extent_id].DeAllocatePage(index);
+      break;
+    }
+    extent_id++;
+  }  
+  if(B[extent_id].AllocatePage(index))
+    return logical_id;
+  else{
+    return 0;
+  }
 }
 
 void DiskManager::DeAllocatePage(page_id_t logical_page_id) {
-  page_id_t physical_page_id = MapPageId(logical_page_id);  
-  bool j = (physical_page_id*PAGE_SIZE >= GetFileSize(file_name_));
+  page_id_t physical_page_id = MapPageId(logical_page_id);
+  bool j = ((physical_page_id + 1)*PAGE_SIZE <= GetFileSize(file_name_));
   ASSERT(j, "Not implemented yet.");
-  char * page_data[PAGE_SIZE];
+
+  uint32_t extent_id = 1,index = logical_page_id + 1;
+  uint32_t extent_pages = 0,before_pages = 0;
+  uint32_t n = A.GetExtentNums();
+  while(extent_id <= n){
+    before_pages = extent_pages;
+    extent_pages += A.GetExtentUsedPage(extent_id) - 1;
+    if(index <= extent_pages){
+      index -= before_pages - 1;
+      B[extent_id].DeAllocatePage(index);
+      break;
+    }
+    extent_id++;
+  }  
+  char page_data[PAGE_SIZE];
   memset(page_data, 0, PAGE_SIZE);
   WritePhysicalPage(physical_page_id,page_data);
 }
 
 bool DiskManager::IsPageFree(page_id_t logical_page_id) {
-  uint32_t extent_id = 1,index = logical_page_id+1;
-  uint32_t extent_pages;
+  uint32_t extent_id = 1,index = logical_page_id + 1;
+  uint32_t extent_pages = 0,before_pages = 0;
   uint32_t n = A.GetExtentNums();
   while(extent_id <= n){
-    extent_pages = A.GetExtentUsedPage(extent_id);
+    before_pages = extent_pages;
+    extent_pages += A.GetExtentUsedPage(extent_id) - 1;
     if(index <= extent_pages){
-      return(B.IsPageFree(index-1));
+      index -= before_pages - 1;
+      return B[extent_id].IsPageFree(index);
     }
     extent_id++;
-    index -= extent_pages;
   }
   return false;
 }
@@ -84,14 +117,14 @@ page_id_t DiskManager::MapPageId(page_id_t logical_page_id) {
   page_id_t physical_page_id = 0,logical_id = 0;
   uint32_t num_extent = A.GetExtentNums();
   uint32_t extent_id = 1;
-  uint32_t extent_pages;
+  uint32_t extent_pages = 0;
   while(extent_id <= num_extent){
-    physical_page_id++;
-    extent_pages = A.GetExtentUsedPage(extent_id);
+    physical_page_id += 2;
+    extent_pages = A.GetExtentUsedPage(extent_id)-1;
     for(uint32_t i = 0 ; i < extent_pages ; i++){
-      physical_page_id++;
       if(logical_id == logical_page_id) return physical_page_id;
       logical_id++;
+      physical_page_id++;
     }
     extent_id++;
   }
