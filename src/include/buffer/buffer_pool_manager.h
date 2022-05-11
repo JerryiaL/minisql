@@ -21,7 +21,6 @@ public:
   /**
    * @brief 根据逻辑页号获取对应的数据页，如果该数据页不在内存中，则需要从磁盘中进行读取
    * 如果空闲页列表（free_list_）中没有可用的页面并且没有可以被替换的数据页，则应返回 nullptr。
-   * FlushPage操作应该将页面内容转储到磁盘中，无论其是否被固定。
    * 
    * @param page_id 
    * @return Page* 
@@ -37,7 +36,7 @@ public:
   bool UnpinPage(page_id_t page_id, bool is_dirty);
 
   /**
-   * @brief 将数据页转储到磁盘中
+   * @brief 将数据页转储到磁盘中，无论其是否被固定。
    * 
    * @param page_id
    */
