@@ -1,16 +1,23 @@
 #include "page/bitmap_page.h"
+#include "glog/logging.h"
 template<size_t PageSize>
 #define FILENAME "data"
 bool BitmapPage<PageSize>::AllocatePage(uint32_t &page_offset) {
-  if (page_allocated_ == MAX_CHARS) {
+  if (page_allocated_ == 8*MAX_CHARS) {
     return false;
   }
-  bytes[next_free_page_] = 1;
+  int byteindex = next_free_page_/8;
+  int bitindex = next_free_page_%8;
+  int tmp = 1<<bitindex;
+  bytes[byteindex] |= tmp;
   page_allocated_++;
   page_offset = next_free_page_;
-  if (page_allocated_ < MAX_CHARS) {
-    for (size_t i = next_free_page_; i < MAX_CHARS; i++) {
-      if (bytes[i] == 0){
+  if (page_allocated_ < 8*MAX_CHARS) {
+    for (size_t i = next_free_page_; i < 8*MAX_CHARS; i++) {
+      byteindex = i/8;
+      bitindex = i%8;
+      tmp = 1<<bitindex;
+      if ((bytes[byteindex] & tmp) == 0){
         next_free_page_ = i;
         break;
 	  }
@@ -21,8 +28,12 @@ bool BitmapPage<PageSize>::AllocatePage(uint32_t &page_offset) {
 
 template<size_t PageSize>
 bool BitmapPage<PageSize>::DeAllocatePage(uint32_t page_offset) {
-  if (bytes[page_offset] == 0) return false;
-  bytes[page_offset] = 0;
+  int byteindex = page_offset/8;
+  int bitindex = page_offset%8;
+  int tmp = 1<<bitindex;
+  if ((bytes[byteindex] & tmp) == 0) return false;
+  tmp = ~tmp;
+  bytes[byteindex] &= tmp;
   page_allocated_--;
   next_free_page_ = std::min(next_free_page_, page_offset);
   return true;
@@ -30,7 +41,11 @@ bool BitmapPage<PageSize>::DeAllocatePage(uint32_t page_offset) {
 
 template<size_t PageSize>
 bool BitmapPage<PageSize>::IsPageFree(uint32_t page_offset) const {
-  if (bytes[page_offset] == 0)
+  
+  int byteindex = page_offset/8;
+  int bitindex = page_offset%8;
+  int tmp = 1<<bitindex;
+  if ((bytes[byteindex] & tmp) == 0)
     return true;
   else
     return false;
@@ -38,8 +53,8 @@ bool BitmapPage<PageSize>::IsPageFree(uint32_t page_offset) const {
 
 template<size_t PageSize>
 bool BitmapPage<PageSize>::IsPageFreeLow(uint32_t byte_index, uint8_t bit_index) const {
-  int offset = byte_index * 8 + bit_index;
-  if (bytes[offset] == 0)
+  int tmp = 1<<bit_index;
+  if ((bytes[byte_index] & tmp) == 0)
     return true;
   else
     return false;
