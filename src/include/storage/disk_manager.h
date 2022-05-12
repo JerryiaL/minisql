@@ -66,10 +66,8 @@ public:
    * Get Meta Page
    * Note: Used only for debug
    */
-  char *GetMetaData() {
-    return meta_data_;
-  }
-
+  char *GetMetaData();
+  
   static constexpr size_t BITMAP_SIZE = BitmapPage<PAGE_SIZE>::GetMaxSupportedSize();
 
 private:
