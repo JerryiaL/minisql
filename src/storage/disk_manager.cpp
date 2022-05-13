@@ -7,7 +7,8 @@
 
 DiskFileMetaPage a;
 DiskFileMetaPage *A = &a;
-BitmapPage<PAGE_SIZE> B[16];
+#define MAX_EXTENT 8
+BitmapPage<PAGE_SIZE> B[MAX_EXTENT];
 
 DiskManager::DiskManager(const std::string &db_file) : file_name_(db_file) {
   std::scoped_lock<std::recursive_mutex> lock(db_io_latch_);
@@ -53,10 +54,6 @@ page_id_t DiskManager::AllocatePage() {
   while(!IsPageFree(logical_id)){
     logical_id++;
   }//printf("b2\n");
-  // if((MapPageId(logical_id)+1)*PAGE_SIZE >= GetFileSize(file_name_)){
-  //   //ASSERT(false, "Not implemented yet.");
-  //   return INVALID_PAGE_ID;
-  // }
   if(A->num_extents_ < logical_id/BITMAP_SIZE + 1) 
   A->num_extents_= logical_id/BITMAP_SIZE + 1;
   A->num_allocated_pages_ = A->num_allocated_pages_ + 1;
@@ -64,6 +61,43 @@ page_id_t DiskManager::AllocatePage() {
 
   uint32_t extent_id = logical_id / BITMAP_SIZE ,index = logical_id % BITMAP_SIZE ;
   B[extent_id].AllocatePage(index);
+  //write bitmap page
+  char temp_char[PAGE_SIZE];
+  uint32_t page_allocated_ = B[extent_id].Get_page_allocated_();
+  temp_char[0] = page_allocated_; page_allocated_ = page_allocated_ >> 8;
+  temp_char[1] = page_allocated_; page_allocated_ = page_allocated_ >> 8;
+  temp_char[2] = page_allocated_; page_allocated_ = page_allocated_ >> 8;
+  temp_char[3] = page_allocated_;
+  uint32_t next_free_page_ = B[extent_id].Get_next_free_page_();
+  temp_char[4] = next_free_page_; next_free_page_ = next_free_page_ >> 8;
+  temp_char[5] = next_free_page_; next_free_page_ = next_free_page_ >> 8;
+  temp_char[6] = next_free_page_; next_free_page_ = next_free_page_ >> 8;
+  temp_char[7] = next_free_page_;
+  for (uint32_t i = 0; i < PAGE_SIZE- 2 * sizeof(uint32_t) ; i++){
+    temp_char[i + 2 * sizeof(uint32_t)] = B[extent_id].IsPageFree(i + 2 * sizeof(uint32_t));
+  }
+  WritePhysicalPage(1 + extent_id*(BITMAP_SIZE + 1), temp_char);
+  //write meta page
+  u_int32_t a;
+  a = A->num_allocated_pages_;
+  meta_data_[0] = a; a = a >> 8;
+  meta_data_[1] = a; a = a >> 8;
+  meta_data_[2] = a; a = a >> 8;
+  meta_data_[3] = a; 
+
+  a = A->num_extents_;
+  meta_data_[4] = a; a = a >> 8;
+  meta_data_[5] = a; a = a >> 8;
+  meta_data_[6] = a; a = a >> 8;
+  meta_data_[7] = a;
+  for(uint32_t i = 0 ; i < A->num_extents_; i++){
+    a = A->extent_used_page_[i];
+    meta_data_[8+i*4] = a; a = a >> 8;
+    meta_data_[9+i*4] = a; a = a >> 8;
+    meta_data_[10+i*4] = a; a = a >> 8;
+    meta_data_[11+i*4] = a;
+  }
+  WritePhysicalPage(META_PAGE_ID, meta_data_);  
   return logical_id;
 }
 
@@ -78,7 +112,44 @@ void DiskManager::DeAllocatePage(page_id_t logical_page_id) {
   WritePhysicalPage(physical_page_id,page_data);
   B[extent_id].DeAllocatePage(index);
   A->extent_used_page_[extent_id] -= 1;
-  A->num_allocated_pages_ -= 1;
+  A->num_allocated_pages_ = A->num_allocated_pages_ - 1;
+  //write bitmap page  
+  char temp_char[PAGE_SIZE];
+  uint32_t page_allocated_ = B[extent_id].Get_page_allocated_();
+  temp_char[0] = page_allocated_; page_allocated_ = page_allocated_ >> 8;
+  temp_char[1] = page_allocated_; page_allocated_ = page_allocated_ >> 8;
+  temp_char[2] = page_allocated_; page_allocated_ = page_allocated_ >> 8;
+  temp_char[3] = page_allocated_;
+  uint32_t next_free_page_ = B[extent_id].Get_next_free_page_();
+  temp_char[4] = next_free_page_; next_free_page_ = next_free_page_ >> 8;
+  temp_char[5] = next_free_page_; next_free_page_ = next_free_page_ >> 8;
+  temp_char[6] = next_free_page_; next_free_page_ = next_free_page_ >> 8;
+  temp_char[7] = next_free_page_;
+  for (uint32_t i = 0; i < PAGE_SIZE- 2 * sizeof(uint32_t) ; i++){
+    temp_char[i + 2 * sizeof(uint32_t)] = B[extent_id].IsPageFree(i + 2 * sizeof(uint32_t));
+  }
+  WritePhysicalPage(1 + extent_id*(BITMAP_SIZE + 1), temp_char);
+  //write meta page
+  u_int32_t a;
+  a = A->num_allocated_pages_;
+  meta_data_[0] = a; a = a >> 8;
+  meta_data_[1] = a; a = a >> 8;
+  meta_data_[2] = a; a = a >> 8;
+  meta_data_[3] = a; 
+
+  a = A->num_extents_;
+  meta_data_[4] = a; a = a >> 8;
+  meta_data_[5] = a; a = a >> 8;
+  meta_data_[6] = a; a = a >> 8;
+  meta_data_[7] = a;
+  for(uint32_t i = 0 ; i < A->num_extents_; i++){
+    a = A->extent_used_page_[i];
+    meta_data_[8+i*4] = a; a = a >> 8;
+    meta_data_[9+i*4] = a; a = a >> 8;
+    meta_data_[10+i*4] = a; a = a >> 8;
+    meta_data_[11+i*4] = a;
+  }
+  WritePhysicalPage(META_PAGE_ID, meta_data_);
 }
 
 bool DiskManager::IsPageFree(page_id_t logical_page_id) {
@@ -87,29 +158,26 @@ bool DiskManager::IsPageFree(page_id_t logical_page_id) {
   uint32_t n = A->GetExtentNums();
   extent_id = logical_page_id / BITMAP_SIZE ;
   if(extent_id >= n){
+    if(extent_id > MAX_EXTENT){
+      printf("over the range ");
+      return false;
+    }
     A->num_extents_ += 1;
-    extent_id++;
+    extent_id++; 
   }
   return B[extent_id].IsPageFree(index);
   
 }
 
 page_id_t DiskManager::MapPageId(page_id_t logical_page_id) {
-  page_id_t physical_page_id = 0,logical_id = 0;
-  uint32_t num_extent = A->GetExtentNums();
-  uint32_t extent_id = 0;
-  uint32_t extent_pages = 0;
-  while(extent_id < num_extent){
-    physical_page_id += 2;
-    extent_pages = A->GetExtentUsedPage(extent_id)-1;
-    for(uint32_t i = 0 ; i < extent_pages ; i++){
-      if(logical_id == logical_page_id) return physical_page_id;
-      logical_id++;
-      physical_page_id++;
-    }
-    extent_id++;
-  }
-  return -1;
+  page_id_t physical_page_id = 0;
+  uint32_t extent_id = logical_page_id / BITMAP_SIZE ;
+  uint32_t index = logical_page_id % BITMAP_SIZE ;
+  physical_page_id = extent_id*(BITMAP_SIZE + 1) + index + 2;
+
+  return physical_page_id;
+  
+
 }
 
 int DiskManager::GetFileSize(const std::string &file_name) {
@@ -176,7 +244,6 @@ char *DiskManager::GetMetaData() {
     meta_data_[10+i*4] = a; a = a >> 8;
     meta_data_[11+i*4] = a;
   }
-  //free(m_data);
   
   return meta_data_;
 }
