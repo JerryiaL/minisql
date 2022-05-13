@@ -75,7 +75,6 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
 Page *BufferPoolManager::NewPage(page_id_t &page_id) {
   // 0.   Make sure you call AllocatePage!
   page_id_t page_id_allocate = AllocatePage();
-
   // 1.   If all the pages in the buffer pool are pinned, return nullptr.
   bool isAllPinned = true;
   for (size_t i = 0; i < pool_size_; i++) {
@@ -84,9 +83,11 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
       break;
     }
   }
-  if (isAllPinned) 
+  if (isAllPinned) {
+    DeallocatePage(page_id_allocate);
     return nullptr;
-  
+  }
+
   // 2.   Pick a victim page P from either the free list or the replacer. Always pick from the free list first.
   frame_id_t frame_id = INVALID_FRAME_ID;
   Page *p = nullptr;
@@ -155,34 +156,42 @@ bool BufferPoolManager::DeletePage(page_id_t page_id) {
 
 bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
   // Process is_dirty lazily when that page be victimized by replacer
-  for (frame_id_t frame_id = 0; frame_id < pool_size_; frame_id++) {
-    if (page_id == pages_[frame_id].GetPageId()) {
-      Page* p = pages_ + frame_id;
-      p->pin_count_--;
-      if (p->pin_count_ == 0) {
-        replacer_->Unpin(frame_id);
-      }
-      return true;
-    }
+  auto result = page_table_.find(page_id);
+  if (result == page_table_.end()) {
+    return false;
   }
-  return false;
+  else {
+    frame_id_t frame_id = result->second;
+    Page* p = pages_ + frame_id;
+    if(p->pin_count_ > 0) p->pin_count_--;
+    if (p->pin_count_ == 0) {
+      replacer_->Unpin(frame_id);
+      if (is_dirty) {
+        disk_manager_->WritePage(page_id, p->GetData());
+        p->is_dirty_ = false;
+      }
+    }
+    return true;
+  }
 }
 
 bool BufferPoolManager::FlushPage(page_id_t page_id) {
-  for (frame_id_t frame_id = 0; frame_id < pool_size_; frame_id++) {
-    if (page_id == pages_[frame_id].GetPageId()) {
-      Page* p = pages_ + frame_id;
-      disk_manager_->WritePage(page_id, p->GetData());
-      page_table_.erase(page_id);
-      p->pin_count_ = 0;
-      p->is_dirty_ = false;
-      p->page_id_ = INVALID_PAGE_ID;
-      p->ResetMemory();
-      free_list_.push_back(frame_id);
-      return true;
-    }
+  auto result = page_table_.find(page_id);
+  if (result == page_table_.end()) {
+    return false;
   }
-  return false;
+  else {
+    frame_id_t frame_id = result->second;
+    Page* p = pages_ + frame_id;
+    disk_manager_->WritePage(page_id, p->GetData());
+    // page_table_.erase(page_id);
+    // p->pin_count_ = 0;
+    // p->is_dirty_ = false;
+    // p->page_id_ = INVALID_PAGE_ID;
+    // p->ResetMemory();
+    // free_list_.push_back(frame_id);
+    return true;
+  }
 }
 
 page_id_t BufferPoolManager::AllocatePage() {
