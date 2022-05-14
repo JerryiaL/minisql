@@ -27,7 +27,8 @@ public:
 
   /**
    * Insert a tuple into the table. If the tuple is too large (>= page_size), return false.
-   * @param[in/out] row Tuple Row to insert, the rid of the inserted tuple is wrapped in object row
+   * 插入记录后生成的RowId需要通过参数中row.rid_返回；
+   * @param[in/out] row Tuple Row to insert, the RowId of the inserted tuple is wrapped in object row
    * @param[in] txn The transaction performing the insert
    * @return true iff the insert is successful
    */
@@ -44,7 +45,7 @@ public:
   /**
    * if the new tuple is too large to fit in the old page, return false (will delete and insert)
    * @param[in] row Tuple of new row
-   * @param[in] rid Rid of the old tuple
+   * @param[in] rid RowId of the old tuple
    * @param[in] txn Transaction performing the update
    * @return true is update is successful.
    */
@@ -52,20 +53,20 @@ public:
 
   /**
    * Called on Commit/Abort to actually delete a tuple or rollback an insert.
-   * @param rid Rid of the tuple to delete
+   * @param rid RowId of the tuple to delete
    * @param txn Transaction performing the delete.
    */
   void ApplyDelete(const RowId &rid, Transaction *txn);
 
   /**
    * Called on abort to rollback a delete.
-   * @param[in] rid Rid of the deleted tuple.
+   * @param[in] rid RowId of the deleted tuple.
    * @param[in] txn Transaction performing the rollback
    */
   void RollbackDelete(const RowId &rid, Transaction *txn);
 
   /**
-   * Read a tuple from the table.
+   * Read a tuple from the table. 获取RowId为row->rid_的记录
    * @param[in/out] row Output variable for the tuple, row id of the tuple is wrapped in row
    * @param[in] txn transaction performing the read
    * @return true if the read was successful (i.e. the tuple exists)
@@ -73,7 +74,7 @@ public:
   bool GetTuple(Row *row, Transaction *txn);
 
   /**
-   * Free table heap and release storage in disk file
+   * Free table heap and release storage in disk file. 销毁整个TableHeap并释放这些数据页
    */
   void FreeHeap();
 

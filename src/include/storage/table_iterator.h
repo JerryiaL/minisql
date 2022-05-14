@@ -26,8 +26,18 @@ public:
 
   Row *operator->();
 
+  /**
+   * @brief 移动到下一条记录，通过++iter调用
+   * 
+   * @return TableIterator& 
+   */
   TableIterator &operator++();
 
+  /**
+   * @brief 移动到下一条记录，通过iter++调用
+   * 
+   * @return TableIterator 
+   */
   TableIterator operator++(int);
 
 private:
