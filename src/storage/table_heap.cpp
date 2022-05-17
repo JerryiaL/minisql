@@ -1,16 +1,32 @@
 #include "storage/table_heap.h"
+#include "glog/logging.h"
 
 bool TableHeap::InsertTuple(Row &row, Transaction *txn) {
-  RowId rid = row.GetRowId();
-  auto page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(rid.GetPageId()));
+  page_id_t page_id = first_page_id_;
+  auto page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(page_id));
   if (page == nullptr) {
     return false;
-  }  
+  }
   page->WLatch();
-  page->InsertTuple(row, schema_, txn, lock_manager_, log_manager_);
+  bool f = page->InsertTuple(row, schema_, txn, lock_manager_, log_manager_);
   page->WUnlatch();
   buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
-  return true;
+  if (f == true) {
+    return true;
+  } else {
+    page_id_t pre_id = page_id;
+    page = reinterpret_cast<TablePage *>(buffer_pool_manager_->NewPage(page_id));
+    page->Init(page_id, pre_id, log_manager_, txn);
+    page->SetNextPageId(page_id);
+    if (page == nullptr) {
+      return false;
+    }
+    page->WLatch();
+    f = page->InsertTuple(row, schema_, txn, lock_manager_, log_manager_);
+    page->WUnlatch();
+    buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
+  }
+  return f;
 }
 
 bool TableHeap::MarkDelete(const RowId &rid, Transaction *txn) {
@@ -33,19 +49,26 @@ bool TableHeap::UpdateTuple(const Row &row, const RowId &rid, Transaction *txn) 
   if (page == nullptr) {
     return false;
   }
-  Row old_row (rid);
+  Row old_row(rid);
   page->WLatch();
   UpdateTablePageStatus f = page->UpdateTuple(row, &old_row, schema_, txn, lock_manager_, log_manager_);
   page->WUnlatch();
   buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
-  if(f == UpdateTablePageStatus::completed) return true;
-  else return false;
+  if (f == UpdateTablePageStatus::completed)
+    return true;
+  else
+    return false;
 }
 
 void TableHeap::ApplyDelete(const RowId &rid, Transaction *txn) {
   // Step1: Find the page which contains the tuple.
+  auto page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(rid.GetPageId()));
+  assert(page != nullptr);
   // Step2: Delete the tuple from the page.
-
+  // page->WLatch(); *********************************** whether can add in?
+  page->ApplyDelete(rid, txn, log_manager_);
+  // page->WUnlatch();
+  buffer_pool_manager_->DeletePage(page->GetTablePageId());
 }
 
 void TableHeap::RollbackDelete(const RowId &rid, Transaction *txn) {
@@ -60,7 +83,8 @@ void TableHeap::RollbackDelete(const RowId &rid, Transaction *txn) {
 }
 
 void TableHeap::FreeHeap() {
-
+  delete buffer_pool_manager_;
+  delete schema_;
 }
 
 bool TableHeap::GetTuple(Row *row, Transaction *txn) {
@@ -72,16 +96,24 @@ bool TableHeap::GetTuple(Row *row, Transaction *txn) {
 
   bool f;
   page->WLatch();
-  f = page->GetTuple(row, schema_, txn, lock_manager_) ;
+  f = page->GetTuple(row, schema_, txn, lock_manager_);
   page->WUnlatch();
   buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
   return f;
 }
 
-TableIterator TableHeap::Begin(Transaction *txn) {
-  return TableIterator();
+TableIterator TableHeap::Begin(Transaction *txn) { 
+  auto page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(first_page_id_));
+  auto rid = new RowId();
+  page->GetFirstTupleRid(rid);
+  LOG(INFO) << "begin: " << rid->GetPageId() << " " << rid->GetSlotNum() << std::endl;
+  LOG(INFO) << "begin: " << Row(*rid).GetRowId().GetPageId() << " " << Row(*rid).GetRowId().GetSlotNum() << std::endl;
+  return TableIterator(this, Row(*rid));
 }
 
-TableIterator TableHeap::End() {
-  return TableIterator();
+TableIterator TableHeap::End() { 
+  auto rid = new RowId(INVALID_ROWID);
+  LOG(INFO) << "end: " << rid->GetPageId() << " " << rid->GetSlotNum() << std::endl;
+  LOG(INFO) << "end: " << Row(*rid).GetRowId().GetPageId() << " " << Row(*rid).GetRowId().GetSlotNum() << std::endl;
+  return TableIterator(this, Row(*rid));
 }

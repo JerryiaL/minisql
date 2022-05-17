@@ -27,4 +27,6 @@ foreach (test_source ${MINISQL_TEST_SOURCES})
     # Add the test under CTest.
     add_test(${test_name} ${CMAKE_BINARY_DIR}/test/${test_name} --gtest_color=yes
             --gtest_output=xml:${CMAKE_BINARY_DIR}/test/${test_name}.xml)
+
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 endforeach (test_source ${MINISQL_TEST_SOURCES})

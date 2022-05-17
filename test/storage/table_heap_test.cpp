@@ -3,9 +3,11 @@
 
 #include "common/instance.h"
 #include "gtest/gtest.h"
+#include "glog/logging.h"
 #include "record/field.h"
 #include "record/schema.h"
 #include "storage/table_heap.h"
+#include "storage/table_iterator.h"
 #include "utils/utils.h"
 
 static string db_file_name = "table_heap_test.db";
@@ -50,7 +52,27 @@ TEST(TableHeapTest, TableHeapSampleTest) {
       ASSERT_EQ(CmpBool::kTrue, row.GetField(j)->CompareEquals(row_kv.second->at(j)));
     }
     // free spaces
-    delete row_kv.second;
+    // delete row_kv.second;
+  }
+  LOG(INFO) << table_heap->GetFirstPageId() << std::endl;
+  auto page = reinterpret_cast<TablePage *>(engine.bpm_->FetchPage(table_heap->GetFirstPageId()));
+  auto rid = new RowId();
+  page->GetFirstTupleRid(rid);
+  LOG(INFO) << rid->GetPageId() << " " << rid->GetSlotNum() << std::endl;
+  auto it(table_heap->Begin(nullptr));
+  LOG(INFO) << "begin: " << it->GetRowId().GetPageId() << " " << it->GetRowId().GetSlotNum() << std::endl;
+  it = table_heap->End();
+  LOG(INFO) << "end: " << it->GetRowId().GetPageId() << " " << it->GetRowId().GetSlotNum() << std::endl;
+
+  for (auto it = table_heap->Begin(nullptr); it != table_heap->End(); it++) {
+    LOG(INFO) << "Hey" << std::endl;
+    Row row = *it;
+    std::vector<Field *> fields = row.GetFields();
+    table_heap->GetTuple(&row, nullptr);
+    ASSERT_EQ(schema.get()->GetColumnCount(), row.GetFields().size());
+    for (size_t j = 0; j < schema.get()->GetColumnCount(); j++) {
+      ASSERT_EQ(CmpBool::kTrue, row.GetField(j)->CompareEquals(*fields[j]));
+      LOG(INFO) << row.GetField(j)[0].GetData() << row.GetField(j)[1].GetData() << row.GetField(j)[2].GetData() << std::endl;
+    }
   }
 }
-
