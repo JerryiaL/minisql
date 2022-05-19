@@ -80,13 +80,17 @@ protected:
 
 class TypeInt : public Type {
 public:
-  explicit TypeInt() : Type(TypeId::kTypeInt) {}
+  explicit TypeInt() : Type(TypeId::kTypeInt) {
+    ret_buffer_ = new char[256];
+  }
 
   virtual uint32_t SerializeTo(const Field &field, char *buf) const override;
 
   virtual uint32_t DeserializeFrom(char *storage, Field **field, bool is_null, MemHeap *heap) const override;
 
   virtual uint32_t GetSerializedSize(const Field &field, bool is_null) const override;
+
+  virtual const char *GetData(const Field &val) const override;
 
   virtual CmpBool CompareEquals(const Field &left, const Field &right) const override;
 
@@ -99,6 +103,8 @@ public:
   virtual CmpBool CompareGreaterThan(const Field &left, const Field &right) const override;
 
   virtual CmpBool CompareGreaterThanEquals(const Field &left, const Field &right) const override;
+
+  char* ret_buffer_;
 };
 
 class TypeChar : public Type {
@@ -130,13 +136,17 @@ public:
 
 class TypeFloat : public Type {
 public:
-  explicit TypeFloat() : Type(TypeId::kTypeFloat) {}
+  explicit TypeFloat() : Type(TypeId::kTypeFloat) {
+    ret_buffer_ = new char[256];
+  }
 
   virtual uint32_t SerializeTo(const Field &field, char *buf) const override;
 
   virtual uint32_t DeserializeFrom(char *storage, Field **field, bool is_null, MemHeap *heap) const override;
 
   virtual uint32_t GetSerializedSize(const Field &field, bool is_null) const override;
+
+  virtual const char *GetData(const Field &val) const override;
 
   virtual CmpBool CompareEquals(const Field &left, const Field &right) const override;
 
@@ -149,6 +159,8 @@ public:
   virtual CmpBool CompareGreaterThan(const Field &left, const Field &right) const override;
 
   virtual CmpBool CompareGreaterThanEquals(const Field &left, const Field &right) const override;
+
+  char* ret_buffer_;
 };
 
 
