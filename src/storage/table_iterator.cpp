@@ -3,11 +3,13 @@
 #include "storage/table_heap.h"
 #include "glog/logging.h"
 
-TableIterator::TableIterator(TableHeap *table_heap, Row row) : table_heap_(table_heap), row_(&row) {
+TableIterator::TableIterator(TableHeap *table_heap, Row row) : table_heap_(table_heap) {
+  row_ = new Row(row.GetRowId());
   LOG(INFO) << "it construct: " << row_->GetRowId().GetPageId() << " " << row_->GetRowId().GetSlotNum() << std::endl;
 }
 
-TableIterator::TableIterator(const TableIterator &other) : table_heap_(other.table_heap_), row_(other.row_) {
+TableIterator::TableIterator(const TableIterator &other) : table_heap_(other.table_heap_) {
+  row_ = new Row(other.row_->GetRowId());
   LOG(INFO) << "it copy: " << row_->GetRowId().GetPageId() << " " << row_->GetRowId().GetSlotNum() << std::endl;
 }
 

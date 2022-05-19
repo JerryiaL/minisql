@@ -67,6 +67,7 @@ public:
 
   /**
    * Read a tuple from the table. 获取RowId为row->rid_的记录
+   * 使用某一个 Row 之前，必须先 GetTuple！！！
    * @param[in/out] row Output variable for the tuple, row id of the tuple is wrapped in row
    * @param[in] txn transaction performing the read
    * @return true if the read was successful (i.e. the tuple exists)
