@@ -6,27 +6,46 @@ bool TableHeap::InsertTuple(Row &row, Transaction *txn) {
   auto page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(page_id));
   if (page == nullptr) {
     return false;
-  }
+  } 
   page->WLatch();
   bool f = page->InsertTuple(row, schema_, txn, lock_manager_, log_manager_);
   page->WUnlatch();
-  buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
-  if (f == true) {
+  buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);  
+  if( f == true){
     return true;
-  } else {
+  }else{
+    while(page->GetNextPageId() !=  -1){
+      page_id = page->GetNextPageId();
+      page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(page_id));
+      if (page == nullptr) {
+        return false;
+      }
+      page->WLatch();
+      bool f = page->InsertTuple(row, schema_, txn, lock_manager_, log_manager_);
+      page->WUnlatch();
+      buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);  
+      if( f == true){
+        return true;
+      }
+    }
     page_id_t pre_id = page_id;
     page = reinterpret_cast<TablePage *>(buffer_pool_manager_->NewPage(page_id));
-    page->Init(page_id, pre_id, log_manager_, txn);
+    page->Init(page_id,pre_id,log_manager_,txn);
+    page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(pre_id));
+    page->WLatch(); 
     page->SetNextPageId(page_id);
-    if (page == nullptr) {
-      return false;
-    }
-    page->WLatch();
-    f = page->InsertTuple(row, schema_, txn, lock_manager_, log_manager_);
     page->WUnlatch();
     buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
+    if (page == nullptr) {
+      return false;
+    }//cout << page->GetNextPageId() << endl;
+    page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(page_id));
+    page->WLatch(); 
+    f = page->InsertTuple(row, schema_, txn, lock_manager_, log_manager_); 
+    page->WUnlatch();
+    buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
+    return f;   
   }
-  return f;
 }
 
 bool TableHeap::MarkDelete(const RowId &rid, Transaction *txn) {
@@ -88,19 +107,19 @@ void TableHeap::FreeHeap() {
 }
 
 bool TableHeap::GetTuple(Row *row, Transaction *txn) {
-  RowId rid = row->GetRowId();
-  auto page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(rid.GetPageId()));
+ // cout << "GET" << endl;
+  page_id_t page_id = row->GetRowId().GetPageId();
+  //cout << "get page id: " << page_id << endl;
+  auto page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(page_id));
   if (page == nullptr) {
     return false;
-  }
-
+  } 
   bool f;
   page->WLatch();
   f = page->GetTuple(row, schema_, txn, lock_manager_);
   page->WUnlatch();
   buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
-  row->SetRowId(rid); // Why add that ?!!!
-  return f;
+ return f;
 }
 
 TableIterator TableHeap::Begin(Transaction *txn) { 

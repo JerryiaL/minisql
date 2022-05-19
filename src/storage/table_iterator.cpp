@@ -37,7 +37,10 @@ TableIterator &TableIterator::operator++() {
   RowId cur_rid = row_->GetRowId();
   RowId *next_rid = new RowId();
   TablePage* page = reinterpret_cast<TablePage *>(table_heap_->buffer_pool_manager_->FetchPage(cur_rid.GetPageId()));
+  page->WLatch(); 
   page->GetNextTupleRid(cur_rid, next_rid);
+  page->WUnlatch();
+  table_heap_->buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
   if (next_rid->GetPageId() == INVALID_PAGE_ID) {
     auto next_page = reinterpret_cast<TablePage *>(table_heap_->buffer_pool_manager_->FetchPage(page->GetNextPageId()));
     next_page->GetFirstTupleRid(next_rid);
