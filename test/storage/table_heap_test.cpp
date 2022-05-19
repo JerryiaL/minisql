@@ -64,49 +64,18 @@ TEST(TableHeapTest, TableHeapSampleTest) {
   it = table_heap->End();
   LOG(INFO) << "end: " << it->GetRowId().GetPageId() << " " << it->GetRowId().GetSlotNum() << std::endl;
 
-  int loop_cnt = 2;
+  int loop_cnt = 100;
   for (auto it = table_heap->Begin(nullptr); it != table_heap->End() && loop_cnt; it++, loop_cnt--) {
     LOG(INFO) << "Hey" << std::endl;
     Row row = *it;
     table_heap->GetTuple(&row, nullptr);
     std::vector<Field *> fields = row.GetFields();
     LOG(INFO) << "RowId: " << row.GetRowId().GetPageId() << ", " << row.GetRowId().GetSlotNum() << std::endl;
-    LOG(INFO) << "RowId: " << it->GetRowId().GetPageId() << ", " << it->GetRowId().GetSlotNum() << std::endl;
     ASSERT_EQ(schema.get()->GetColumnCount(), row.GetFields().size());
     LOG(INFO) << "fields count: " << schema.get()->GetColumnCount() << ", " << row.GetFields().size() << std::endl;
     for (size_t j = 0; j < schema.get()->GetColumnCount(); j++) {
       ASSERT_EQ(CmpBool::kTrue, row.GetField(j)->CompareEquals(*fields[j]));
-      LOG(INFO) << row.GetField(j)->GetData() << ", " << fields[0]->GetData() << std::endl;
-    }
-    LOG(INFO) << std::endl;
-  }
-
-  LOG(INFO) << "*******************************************" << std::endl;
-
-  loop_cnt = 2;
-  for (auto it = table_heap->Begin(nullptr); it != table_heap->End() && loop_cnt; it++, loop_cnt--) {
-    LOG(INFO) << "Hey" << std::endl;
-    Row row = *it;
-    table_heap->GetTuple(&row, nullptr);
-    std::vector<Field *> fields = row.GetFields();
-    LOG(INFO) << "RowId: " << row.GetRowId().GetPageId() << ", " << row.GetRowId().GetSlotNum() << std::endl;
-    LOG(INFO) << "RowId: " << it->GetRowId().GetPageId() << ", " << it->GetRowId().GetSlotNum() << std::endl;
-    LOG(INFO) << row.GetFields().size() << std::endl;
-    LOG(INFO) << fields[0] << " " << fields[1] << " " << fields[2] << std::endl;
-    ASSERT_EQ(schema.get()->GetColumnCount(), row.GetFields().size());
-    LOG(INFO) << "after compare fields count: " << schema.get()->GetColumnCount() << std::endl;
-    // LOG(INFO) << row.GetField(0) << std::endl;
-    LOG(INFO) << row.GetField(0)->GetData() << ", " << fields[0]->GetData() << std::endl;
-    LOG(INFO) << row.GetField(1)->GetData() << ", " << fields[1]->GetData() << std::endl;
-    LOG(INFO) << row.GetField(2)->GetData() << ", " << fields[2]->GetData() << std::endl;
-    LOG(INFO) << "over output" << std::endl;
-    ASSERT_EQ(CmpBool::kTrue, row.GetField(0)->CompareEquals(*fields[0]));
-    ASSERT_EQ(CmpBool::kTrue, row.GetField(1)->CompareEquals(*fields[1]));
-    ASSERT_EQ(CmpBool::kTrue, row.GetField(2)->CompareEquals(*fields[2]));
-    LOG(INFO) << "over judgement" << std::endl;
-    for (size_t j = 0; j < schema.get()->GetColumnCount(); j++) {
-      ASSERT_EQ(CmpBool::kTrue, row.GetField(j)->CompareEquals(*fields[j]));
-      LOG(INFO) << row.GetField(j)->GetData() << ", " << fields[2]->GetData() << std::endl;
+      LOG(INFO) << "j = " << j << ", " << row.GetField(j)->GetData() << ", " << fields[j]->GetData() << std::endl;
     }
     LOG(INFO) << std::endl;
   }

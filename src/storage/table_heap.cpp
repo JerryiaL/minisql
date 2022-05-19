@@ -99,6 +99,7 @@ bool TableHeap::GetTuple(Row *row, Transaction *txn) {
   f = page->GetTuple(row, schema_, txn, lock_manager_);
   page->WUnlatch();
   buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
+  row->SetRowId(rid); // Why add that ?!!!
   return f;
 }
 
@@ -106,14 +107,14 @@ TableIterator TableHeap::Begin(Transaction *txn) {
   auto page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(first_page_id_));
   auto rid = new RowId();
   page->GetFirstTupleRid(rid);
-  LOG(INFO) << "begin: " << rid->GetPageId() << " " << rid->GetSlotNum() << std::endl;
-  LOG(INFO) << "begin: " << Row(*rid).GetRowId().GetPageId() << " " << Row(*rid).GetRowId().GetSlotNum() << std::endl;
+  // LOG(INFO) << "begin: " << rid->GetPageId() << " " << rid->GetSlotNum() << std::endl;
+  // LOG(INFO) << "begin: " << Row(*rid).GetRowId().GetPageId() << " " << Row(*rid).GetRowId().GetSlotNum() << std::endl;
   return TableIterator(this, Row(*rid));
 }
 
 TableIterator TableHeap::End() { 
   auto rid = new RowId(INVALID_ROWID);
-  LOG(INFO) << "end: " << rid->GetPageId() << " " << rid->GetSlotNum() << std::endl;
-  LOG(INFO) << "end: " << Row(*rid).GetRowId().GetPageId() << " " << Row(*rid).GetRowId().GetSlotNum() << std::endl;
+  // LOG(INFO) << "end: " << rid->GetPageId() << " " << rid->GetSlotNum() << std::endl;
+  // LOG(INFO) << "end: " << Row(*rid).GetRowId().GetPageId() << " " << Row(*rid).GetRowId().GetSlotNum() << std::endl;
   return TableIterator(this, Row(*rid));
 }
