@@ -31,6 +31,7 @@ bool TableHeap::InsertTuple(Row &row, Transaction *txn) {
     page_id_t pre_id = page_id;
     page = reinterpret_cast<TablePage *>(buffer_pool_manager_->NewPage(page_id));
     page->Init(page_id, pre_id, log_manager_, txn);
+    buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
     page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(pre_id));
     page->WLatch();
     page->SetNextPageId(page_id);
@@ -63,7 +64,7 @@ bool TableHeap::MarkDelete(const RowId &rid, Transaction *txn) {
   return true;
 }
 
-bool TableHeap::UpdateTuple(const Row &row, const RowId &rid, Transaction *txn) {
+bool TableHeap::UpdateTuple(Row &row, const RowId &rid, Transaction *txn) {
   auto page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(rid.GetPageId()));
   if (page == nullptr) {
     return false;
@@ -75,6 +76,13 @@ bool TableHeap::UpdateTuple(const Row &row, const RowId &rid, Transaction *txn) 
   buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
   if (f == UpdateTablePageStatus::completed)
     return true;
+  else if(f == UpdateTablePageStatus::too_much_data){
+    page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(rid.GetPageId()));
+    page->WLatch();
+    page->ApplyDelete(rid,txn,log_manager_);
+    buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
+    InsertTuple(row, txn);
+  }
   else
     return false;
 }

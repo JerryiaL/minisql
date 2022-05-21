@@ -61,7 +61,7 @@ bool TablePage::MarkDelete(const RowId &rid, Transaction *txn, LockManager *lock
   return true;
 }
 
-UpdateTablePageStatus TablePage::UpdateTuple(const Row &new_row, Row *old_row, Schema *schema,
+UpdateTablePageStatus TablePage::UpdateTuple(Row &new_row, Row *old_row, Schema *schema,
                             Transaction *txn, LockManager *lock_manager, LogManager *log_manager) {
   ASSERT(old_row != nullptr && old_row->GetRowId().Get() != INVALID_ROWID.Get(), "invalid old row.");
   uint32_t serialized_size = new_row.GetSerializedSize(schema);

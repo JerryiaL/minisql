@@ -49,7 +49,7 @@ public:
    * @param[in] txn Transaction performing the update
    * @return true is update is successful.
    */
-  bool UpdateTuple(const Row &row, const RowId &rid, Transaction *txn);
+  bool UpdateTuple(Row &row, const RowId &rid, Transaction *txn);
 
   /**
    * Called on Commit/Abort to actually delete a tuple or rollback an insert.
@@ -106,6 +106,7 @@ private:
           lock_manager_(lock_manager) {
             auto page = reinterpret_cast<TablePage *>(buffer_pool_manager->NewPage(first_page_id_));
             page->Init(first_page_id_, INVALID_PAGE_ID, log_manager, txn);
+            buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
             // ASSERT(false, "Not implemented yet.");
   };
 

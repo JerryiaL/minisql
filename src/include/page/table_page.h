@@ -52,7 +52,7 @@ public:
 
   bool MarkDelete(const RowId &rid, Transaction *txn, LockManager *lock_manager, LogManager *log_manager);
 
-  UpdateTablePageStatus UpdateTuple(const Row &new_row, Row *old_row, Schema *schema,
+  UpdateTablePageStatus UpdateTuple(Row &new_row, Row *old_row, Schema *schema,
                    Transaction *txn, LockManager *lock_manager, LogManager *log_manager);
 
   void ApplyDelete(const RowId &rid, Transaction *txn, LogManager *log_manager);
