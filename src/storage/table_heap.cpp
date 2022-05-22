@@ -81,7 +81,7 @@ bool TableHeap::UpdateTuple(Row &row, const RowId &rid, Transaction *txn) {
     page->WLatch();
     page->ApplyDelete(rid,txn,log_manager_);
     buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
-    InsertTuple(row, txn);
+    return InsertTuple(row, txn);
   }
   else
     return false;
@@ -95,12 +95,8 @@ void TableHeap::ApplyDelete(const RowId &rid, Transaction *txn) {
   page->WLatch();
   page->ApplyDelete(rid, txn, log_manager_);
   page->WUnlatch();
-  ddebug(page->GetPinCount());
-  bool Unpin_status = buffer_pool_manager_->UnpinPage(page->GetPageId(), true);
-  ddebug(page->GetPinCount());
-  bool Delete_status = buffer_pool_manager_->DeletePage(page->GetTablePageId());
-  ddebug(Unpin_status);
-  ddebug(Delete_status);
+  buffer_pool_manager_->UnpinPage(page->GetPageId(), true);
+  // buffer_pool_manager_->DeletePage(page->GetTablePageId());
 }
 
 void TableHeap::RollbackDelete(const RowId &rid, Transaction *txn) {

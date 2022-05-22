@@ -38,7 +38,6 @@ TEST(TableHeapTest, TableHeapSampleTest) {
     Row row(*fields);
     table_heap->InsertTuple(row, nullptr);
     row_values[row.GetRowId().Get()] = fields;
-    // LOG(INFO) << row.GetRowId().GetPageId() << " " << row.GetRowId().GetSlotNum() << std::endl;
     delete[] characters;
   }
   engine.bpm_->CheckAllUnpinned();
@@ -57,7 +56,11 @@ TEST(TableHeapTest, TableHeapSampleTest) {
   LOG(INFO) << table_heap->GetFirstPageId() << std::endl;
   auto page = reinterpret_cast<TablePage *>(engine.bpm_->FetchPage(table_heap->GetFirstPageId()));
   auto rid = new RowId();
+  page->WLatch();
   page->GetFirstTupleRid(rid);
+  page->WUnlatch();
+  engine.bpm_->UnpinPage(page->GetPageId(), true);
+
   LOG(INFO) << rid->GetPageId() << " " << rid->GetSlotNum() << std::endl;
   auto it(table_heap->Begin(nullptr));
   LOG(INFO) << "begin: " << it->GetRowId().GetPageId() << " " << it->GetRowId().GetSlotNum() << std::endl;
@@ -66,17 +69,35 @@ TEST(TableHeapTest, TableHeapSampleTest) {
 
   int loop_cnt = 100;
   for (auto it = table_heap->Begin(nullptr); it != table_heap->End() && loop_cnt; it++, loop_cnt--) {
-    LOG(INFO) << "Hey" << std::endl;
+    Row row = *it;
+    // LOG(INFO) << "RowId: " << row.GetRowId().GetPageId() << ", " << row.GetRowId().GetSlotNum() << std::endl;
+    table_heap->GetTuple(&row, nullptr);
+    std::vector<Field *> fields = row.GetFields();
+    ASSERT_EQ(schema.get()->GetColumnCount(), row.GetFields().size());
+    // LOG(INFO) << "fields count: " << schema.get()->GetColumnCount() << ", " << row.GetFields().size() << std::endl;
+    for (size_t j = 0; j < schema.get()->GetColumnCount(); j++) {
+      ASSERT_EQ(CmpBool::kTrue, row.GetField(j)->CompareEquals(*fields[j]));
+      ASSERT_EQ(0, strcmp(row.GetField(j)->GetData(), fields[j]->GetData()));
+      // LOG(INFO) << "j = " << j << ", " << row.GetField(j)->GetData() << ", " << fields[j]->GetData() << std::endl;
+    }
+  }
+  
+  for (int i = 0; i < 20; i++) {
+    RowId rid(2, i);
+    Row row(rid);
+    table_heap->GetTuple(&row, nullptr);
+    table_heap->MarkDelete(rid, nullptr);
+    table_heap->ApplyDelete(rid, nullptr);
+  }
+
+  loop_cnt = 20;
+  for (auto it = table_heap->Begin(nullptr); it != table_heap->End() && loop_cnt; it++, loop_cnt--) {
     Row row = *it;
     LOG(INFO) << "RowId: " << row.GetRowId().GetPageId() << ", " << row.GetRowId().GetSlotNum() << std::endl;
     table_heap->GetTuple(&row, nullptr);
-    std::vector<Field *> fields = row.GetFields();
-
-    ASSERT_EQ(schema.get()->GetColumnCount(), row.GetFields().size());
-    LOG(INFO) << "fields count: " << schema.get()->GetColumnCount() << ", " << row.GetFields().size() << std::endl;
     for (size_t j = 0; j < schema.get()->GetColumnCount(); j++) {
-      ASSERT_EQ(CmpBool::kTrue, row.GetField(j)->CompareEquals(*fields[j]));
-      LOG(INFO) << "j = " << j << ", " << row.GetField(j)->GetData() << ", " << fields[j]->GetData() << std::endl;
+      LOG(INFO) << row.GetField(j)->GetData();
     }
+    LOG(INFO) << std::endl;
   }
 }
