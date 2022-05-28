@@ -43,7 +43,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(const KeyType &key, const KeyComparator &comparator) const {
-  for (int i = 0; i < max_size_; i++)
+  for (int i = 0; i < GetMaxSize(); i++)
     if (comparator(array_[i].first, key) >= 0)
       return i;
   return 0;
@@ -55,7 +55,7 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(const KeyType &key, const KeyComparator
  */
 INDEX_TEMPLATE_ARGUMENTS
 KeyType B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const {
-  ASSERT(0 <= index && index < max_size_, "index invalid");
+  ASSERT(0 <= index && index < GetMaxSize(), "index invalid");
   KeyType key{array_[index].first};
   return key;
 }
@@ -66,7 +66,7 @@ KeyType B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const {
  */
 INDEX_TEMPLATE_ARGUMENTS
 const MappingType &B_PLUS_TREE_LEAF_PAGE_TYPE::GetItem(int index) {
-  ASSERT(0 <= index && index < max_size_, "index invalid");
+  ASSERT(0 <= index && index < GetMaxSize(), "index invalid");
   return array_[index];
 }
 
@@ -203,17 +203,17 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveAllTo(BPlusTreeLeafPage *recipient) {
  * REDISTRIBUTE
  *****************************************************************************/
 /**
- * Remove the first key & value pair from this page to "recipient" page.
+ * Remove the first key & value pair from this page to end of "recipient" page.
  *
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveFirstToEndOf(BPlusTreeLeafPage *recipient) {
-  recipient->CopyNFrom(array_, 1);
+  recipient->CopyLastFrom(array_[0]);
   for (int i = 0; i < GetSize() - 1; i++) {
     array_[i].first = array_[i + 1].first;
     array_[i].second = array_[i + 1].second;
   }
-  IncreaseSize(-1);
+  this->IncreaseSize(-1);
 }
 
 /**
@@ -227,17 +227,11 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyLastFrom(const MappingType &item) {
 }
 
 /**
- * Remove the last key & value pair from this page to "recipient" page.
+ * Remove the last key & value pair from this page to front of "recipient" page.
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveLastToFrontOf(BPlusTreeLeafPage *recipient) {
-  recipient->IncreaseSize(1);
-  for (int i = recipient->GetSize() - 1; i > 0; i--) {
-    recipient->array_[i].first = recipient->array_[i - 1].first;
-    recipient->array_[i].second = recipient->array_[i - 1].second;
-  }
-  recipient->array_[0].first = this->array_[this->GetSize() - 1].first;
-  recipient->array_[0].second = this->array_[this->GetSize() - 1].second;
+  recipient->CopyFirstFrom(array_[GetSize() - 1]);
   this->IncreaseSize(-1);
 }
 
