@@ -20,31 +20,46 @@ INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::Destroy() {
 }
 
-/*
+/**
  * Helper function to decide whether current b+tree is empty
  */
 INDEX_TEMPLATE_ARGUMENTS
 bool BPLUSTREE_TYPE::IsEmpty() const {
-  return false;
+  return root_page_id_ == INVALID_PAGE_ID;
 }
 
 /*****************************************************************************
  * SEARCH
  *****************************************************************************/
-/*
+/**
  * Return the only value that associated with input key
  * This method is used for point query
  * @return : true means key exists
  */
 INDEX_TEMPLATE_ARGUMENTS
 bool BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> &result, Transaction *transaction) {
-  return false;
+  ASSERT(root_page_id_ != INVALID_PAGE_ID, "root_page_id is INVALID_PAGE_ID");
+  page_id_t page_id = root_page_id_;
+  BPlusTreePage* page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(page_id));
+  ASSERT(page.IsRootPage(), "Not Root Page");
+  while (!page.IsLeafPage()) {
+    InternalPage* internal_page = reinterpret_cast<InternalPage *>(page);
+    page_id_t next_page_id = internal_page->Lookup(key, comparator_);
+    buffer_pool_manager_->UnpinPage(page_id, false);
+    page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(next_page_id));
+    page_id = next_page_id;
+  }
+  LeafPage* leaf_page = reinterpret_cast<LeafPage *>(page);
+  ValueType value;
+  bool ret = leaf_page->Lookup(key, value, comparator_);
+  buffer_pool_manager_->UnpinPage(page_id, false);
+  return ret;
 }
 
 /*****************************************************************************
  * INSERTION
  *****************************************************************************/
-/*
+/**
  * Insert constant key & value pair into b+ tree
  * if current tree is empty, start new tree, update root page id and insert
  * entry, otherwise insert into leaf page.
@@ -53,9 +68,13 @@ bool BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> &result
  */
 INDEX_TEMPLATE_ARGUMENTS
 bool BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transaction *transaction) {
-  return false;
+  if (IsEmpty()) {
+    StartNewTree(key, value);
+    return true;
+  }
+  
 }
-/*
+/**
  * Insert constant key & value pair into an empty tree
  * User needs to first ask for new page from buffer pool manager(NOTICE: throw
  * an "out of memory" exception if returned value is nullptr), then update b+
@@ -63,9 +82,19 @@ bool BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
  */
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::StartNewTree(const KeyType &key, const ValueType &value) {
+  Page *new_page = buffer_pool_manager_->NewPage(root_page_id_);
+  ASSERT(new_page != nullptr, "out of memory");
+  
+  LeafPage *leaf_page = reinterpret_cast<LeafPage *>(new_page);
+  leaf_page->Init(root_page_id_, INVALID_PAGE_ID, leaf_max_size_);
+
+  UpdateRootPageId(1);
+  // root page is the leaf page.
+  leaf_page->Insert(key, value, comparator_);
+  buffer_pool_manager_->UnpinPage(root_page_id_, true); 
 }
 
-/*
+/**
  * Insert constant key & value pair into leaf page
  * User needs to first find the right leaf page as insertion target, then look
  * through leaf page to see whether insert key exist or not. If exist, return
@@ -75,10 +104,25 @@ void BPLUSTREE_TYPE::StartNewTree(const KeyType &key, const ValueType &value) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transaction) {
-  return false;
+  if (IsEmpty()) {
+    StartNewTree(key, value);
+    return true;
+  }
+  LeafPage *leaf_page = reinterpret_cast<LeafPage *>(FindLeafPage(key, false));
+  if (leaf_page->Lookup(key, nullptr, comparator_)) {
+    buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false); 
+    return false;
+  }
+  int leaf_size = leaf_page->Insert(key, value, comparator_);
+  if (leaf_size == maxSize(leaf_page) + 1) {
+    LeafPage *new_leaf = Split(leaf_page);
+    InsertIntoParent(leaf_page, new_leaf->KeyAt(0), new_leaf, transaction);
+  }
+  buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), true);
+  return true;
 }
 
-/*
+/**
  * Split input page and return newly created page.
  * Using template N to represent either internal page or leaf page.
  * User needs to first ask for new page from buffer pool manager(NOTICE: throw
@@ -88,10 +132,22 @@ bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value, 
 INDEX_TEMPLATE_ARGUMENTS
 template<typename N>
 N *BPLUSTREE_TYPE::Split(N *node) {
-  return nullptr;
+  page_id_t new_page_id;
+  Page *new_page = buffer_pool_manager_->NewPage(new_page_id);
+  ASSERT(new_page != nullptr, "out of memory");
+  N* recipient = reinterpret_cast<N *>(new_page);
+  if (node->IsLeafPage()) {
+    recipient->Init(new_page_id, node->GetParentPageId(), leaf_max_size_);
+    node->MoveHalfTo(recipient);
+  }
+  else {
+    recipient->Init(new_page_id, node->GetParentPageId(), internal_max_size_);
+    node->MoveHalfTo(recipient, buffer_pool_manager_);
+  }
+  return recipient;
 }
 
-/*
+/**
  * Insert key & value pair into internal page after split
  * @param   old_node      input page from split() method
  * @param   key
@@ -108,7 +164,7 @@ void BPLUSTREE_TYPE::InsertIntoParent(BPlusTreePage *old_node, const KeyType &ke
 /*****************************************************************************
  * REMOVE
  *****************************************************************************/
-/*
+/**
  * Delete key & value pair associated with input key
  * If current tree is empty, return immediately.
  * If not, User needs to first find the right leaf page as deletion target, then
@@ -119,7 +175,7 @@ INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
 }
 
-/*
+/**
  * User needs to first find the sibling of input page. If sibling's size + input
  * page's size > page's max size, then redistribute. Otherwise, merge.
  * Using template N to represent either internal page or leaf page.
@@ -132,7 +188,7 @@ bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N *node, Transaction *transaction) {
   return false;
 }
 
-/*
+/**
  * Move all the key & value pairs from one page to its sibling page, and notify
  * buffer pool manager to delete this page. Parent page must be adjusted to
  * take info of deletion into account. Remember to deal with coalesce or
@@ -151,7 +207,7 @@ bool BPLUSTREE_TYPE::Coalesce(N **neighbor_node, N **node,
   return false;
 }
 
-/*
+/**
  * Redistribute key & value pairs from one page to its sibling page. If index ==
  * 0, move sibling page's first key & value pair into end of input "node",
  * otherwise move sibling page's last key & value pair into head of input
@@ -165,7 +221,7 @@ template<typename N>
 void BPLUSTREE_TYPE::Redistribute(N *neighbor_node, N *node, int index) {
 }
 
-/*
+/**
  * Update root page if necessary
  * NOTE: size of root page can be less than min size and this method is only
  * called within coalesceOrRedistribute() method
@@ -183,7 +239,7 @@ bool BPLUSTREE_TYPE::AdjustRoot(BPlusTreePage *old_root_node) {
 /*****************************************************************************
  * INDEX ITERATOR
  *****************************************************************************/
-/*
+/**
  * Input parameter is void, find the left most leaf page first, then construct
  * index iterator
  * @return : index iterator
@@ -193,7 +249,7 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin() {
   return INDEXITERATOR_TYPE();
 }
 
-/*
+/**
  * Input parameter is low key, find the leaf page that contains the input key
  * first, then construct index iterator
  * @return : index iterator
@@ -203,7 +259,7 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
   return INDEXITERATOR_TYPE();
 }
 
-/*
+/**
  * Input parameter is void, construct an index iterator representing the end
  * of the key/value pair in the leaf node
  * @return : index iterator
@@ -216,17 +272,30 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::End() {
 /*****************************************************************************
  * UTILITIES AND DEBUG
  *****************************************************************************/
-/*
+/**
  * Find leaf page containing particular key, if leftMost flag == true, find
  * the left most leaf page
- * Note: the leaf page is pinned, you need to unpin it after use.
+ * NOTE: the leaf page is pinned, you need to unpin it after use.
  */
 INDEX_TEMPLATE_ARGUMENTS
 Page *BPLUSTREE_TYPE::FindLeafPage(const KeyType &key, bool leftMost) {
-  return nullptr;
+  ASSERT(root_page_id_ != INVALID_PAGE_ID, "root_page_id is INVALID_PAGE_ID");
+  page_id_t page_id = root_page_id_;
+  BPlusTreePage* page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(page_id));
+  ASSERT(page.IsRootPage(), "Not Root Page");
+  while (!page.IsLeafPage()) {
+    InternalPage* internal_page = reinterpret_cast<InternalPage *>(page);
+    page_id_t next_page_id = leftMost ? internal_page->ValueAt(0) : internal_page->Lookup(key, comparator_);
+    buffer_pool_manager_->UnpinPage(page_id, false);
+    page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(next_page_id));
+    page_id = next_page_id;
+  }
+  LeafPage* leaf_page = reinterpret_cast<LeafPage *>(page);
+  // buffer_pool_manager_->UnpinPage(page_id, false);
+  return leaf_page;
 }
 
-/*
+/**
  * Update/Insert root page id in header page(where page_id = 0, header_page is
  * defined under include/page/header_page.h)
  * Call this method everytime root page id is changed.
