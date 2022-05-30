@@ -43,10 +43,20 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(const KeyType &key, const KeyComparator &comparator) const {
-  for (int i = 0; i < GetMaxSize(); i++)
-    if (comparator(array_[i].first, key) >= 0)
-      return i;
-  return 0;
+  // for (int i = 0; i < GetMaxSize(); i++)
+  //   if (comparator(array_[i].first, key) >= 0)
+  //     return i;
+  // return 0;
+  int start = 0, end = GetSize();
+  while (start < end) {
+    int mid = start + (end - start) / 2;
+    if (comparator(array_[mid].first, key) < 0) {
+      start = mid + 1;
+    } else {
+      end = mid;
+    }
+  }
+  return start;
 }
 
 /**
@@ -112,6 +122,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *recipient) {
   //   recipient->array_[j].second = this->array_[i].second;
   // }
   recipient->CopyNFrom(array_ + this->GetMinSize(), GetSize() - GetMinSize());
+  recipient->SetNextPageId(this->GetNextPageId());
   this->SetNextPageId(recipient->GetPageId());
   this->IncreaseSize(GetMinSize() - GetSize());
 }
