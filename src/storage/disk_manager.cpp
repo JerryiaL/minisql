@@ -5,10 +5,6 @@
 #include "page/bitmap_page.h"
 #include "storage/disk_manager.h"
 
-DiskFileMetaPage a;
-DiskFileMetaPage *A = &a;
-#define MAX_EXTENT 8
-BitmapPage<PAGE_SIZE> B[MAX_EXTENT];
 
 DiskManager::DiskManager(const std::string &db_file) : file_name_(db_file) {
   std::scoped_lock<std::recursive_mutex> lock(db_io_latch_);
@@ -26,6 +22,7 @@ DiskManager::DiskManager(const std::string &db_file) : file_name_(db_file) {
     }
   }
   ReadPhysicalPage(META_PAGE_ID, meta_data_);
+  A = new DiskFileMetaPage;
 }
 
 
@@ -58,7 +55,8 @@ page_id_t DiskManager::AllocatePage() {
   A->num_extents_= logical_id/BITMAP_SIZE + 1;
   A->num_allocated_pages_ = A->num_allocated_pages_ + 1;
   A->extent_used_page_[logical_id/BITMAP_SIZE] = logical_id%BITMAP_SIZE + 1;
-
+  // printf("logical_id = %d\n",logical_id);
+  // printf("A->extent_used_page_[logical_id/BITMAP_SIZE] = %d\n",A->extent_used_page_[logical_id/BITMAP_SIZE]);
   uint32_t extent_id = logical_id / BITMAP_SIZE ,index = logical_id % BITMAP_SIZE ;
   B[extent_id].AllocatePage(index);
   //write bitmap page
