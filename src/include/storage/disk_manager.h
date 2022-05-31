@@ -107,7 +107,7 @@ private:
   // DiskFileMetaPage a;
   // DiskFileMetaPage *A = &a;
   DiskFileMetaPage *A ;
-  BitmapPage<PAGE_SIZE> B[8];
+  BitmapPage<PAGE_SIZE> B[MAX_EXTENT];
 };
 
 #endif
