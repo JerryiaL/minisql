@@ -30,7 +30,6 @@ public:
     if (!closed) {
       Close();
     }
-    delete A;
   }
 
   /**
@@ -104,10 +103,6 @@ private:
   bool closed{false};
   char meta_data_[PAGE_SIZE];
 
-  // DiskFileMetaPage a;
-  // DiskFileMetaPage *A = &a;
-  DiskFileMetaPage *A ;
-  BitmapPage<PAGE_SIZE> B[MAX_EXTENT];
 };
 
 #endif
