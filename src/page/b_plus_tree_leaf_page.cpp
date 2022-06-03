@@ -21,7 +21,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id, in
   SetParentPageId(parent_id);
   SetPageId(page_id);
   next_page_id_ = INVALID_PAGE_ID;
-  array_ = new MappingType[max_size]; // use disk manager ???
+  // NO NEED! array_ = new MappingType[max_size]; // use disk manager ???
 }
 
 /**
@@ -136,7 +136,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyNFrom(MappingType *items, int size) {
   this->IncreaseSize(size);
   ASSERT(array_ + curr_size >= items + size || array_ + curr_size + size <= items, "address should not overlapped");
   for (int i = 0; i < size; i++) {
-    this->array_[curr_size + i].first = items[i].fisrt;
+    this->array_[curr_size + i].first = items[i].first;
     this->array_[curr_size + i].second = items[i].second;
   }
 }
@@ -155,7 +155,7 @@ bool B_PLUS_TREE_LEAF_PAGE_TYPE::Lookup(const KeyType &key, ValueType &value, co
   while (start <= end) {
     int mid = start + (end - start) / 2;
     if (comparator(key, array_[mid].first) == 0) {
-      array_[mid].second = value;
+      value = array_[mid].second;
       return true;
     } else if (comparator(key, array_[mid].first) < 0) {
       end = mid - 1;
