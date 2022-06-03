@@ -108,6 +108,7 @@ private:
   KeyComparator comparator_;
   int leaf_max_size_;
   int internal_max_size_;
+  vector<page_id_t> destroy_internal_pages_id;
 };
 
 #endif  // MINISQL_B_PLUS_TREE_H
