@@ -468,12 +468,20 @@ Page* BPLUSTREE_TYPE::FindLeafPage(const KeyType& key, bool leftMost) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::UpdateRootPageId(int insert_record) {
-  ASSERT(false, "SHOULD EDIT LATER");
-  if (!insert_record) {
-    IndexRootsPage::Update(index_id_, root_page_id_);
+  Page* page = buffer_pool_manager_->FetchPage(INDEX_ROOTS_PAGE_ID);
+  ASSERT(page != nullptr, "root fetch fail");
+  IndexRootsPage* node = reinterpret_cast<IndexRootsPage *>(page->GetData());
+  if (!insert_record) { // update
+    bool update_status = node->Update(index_id_, root_page_id_);
+    ASSERT(update_status, "update root fail");
   }
-  else {
-    IndexRootsPage::Insert(index_id_, root_page_id_);
+  else if (insert_record == 1) { // insert
+    bool insert_status = node->Insert(index_id_, root_page_id_);
+    ASSERT(insert_status, "insert root fail");
+  }
+  else { // delete
+    bool delete_status = node->Delete(index_id_);
+    ASSERT(delete_status, "delete root fail");
   }
 }
 

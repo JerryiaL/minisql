@@ -10,6 +10,7 @@
 #include "page/b_plus_tree_page.h"
 #include "transaction/transaction.h"
 #include "index/index_iterator.h"
+#include "page/index_roots_page.h"
 
 #define BPLUSTREE_TYPE BPlusTree<KeyType, ValueType, KeyComparator>
 
