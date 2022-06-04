@@ -3,9 +3,13 @@
 #include "index/index_iterator.h"
 
 INDEX_TEMPLATE_ARGUMENTS INDEXITERATOR_TYPE::IndexIterator(LeafPage* leaf, int index, BufferPoolManager* bpm) :
-  leaf_(leaf), index_(index), bpm_(bpm) {}
+  leaf_(leaf), index_(index), bpm_(bpm) {
+    bpm_->FetchPage(leaf_->GetPageId())->RLatch();
+    bpm_->UnpinPage(leaf_->GetPageId(), false);
+  }
 
 INDEX_TEMPLATE_ARGUMENTS INDEXITERATOR_TYPE::~IndexIterator() {
+  if (!leaf_) return;
   bpm_->FetchPage(leaf_->GetPageId())->RUnlatch();
   bpm_->UnpinPage(leaf_->GetPageId(), false);
   bpm_->UnpinPage(leaf_->GetPageId(), false);
