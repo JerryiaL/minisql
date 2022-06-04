@@ -5,7 +5,7 @@
 /*****************************************************************************
  * HELPER METHODS AND UTILITIES
  *****************************************************************************/
- /*
+ /**
   * Init method after creating a new internal page
   * Including set page type, set current size, set page id, set parent id and set
   * max page size
@@ -18,9 +18,9 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id
   SetMaxSize(max_size);
   SetParentPageId(parent_id);
   SetPageId(page_id);
-  array_[0].first = INVALID_PAGE_ID;
+  // array_[0].first = INVALID_PAGE_ID;
 }
-/*
+/**
  * Helper method to get/set the key associated with input "index"(a.k.a
  * array offset)
  */
@@ -36,7 +36,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetKeyAt(int index, const KeyType& key) {
   this->array_[index].first = key;
 }
 
-/*
+/**
  * Helper method to find and return array index(or offset), so that its value
  * equals to input "value"
  */
@@ -50,7 +50,7 @@ int B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueIndex(const ValueType& value) const {
   return 0;
 }
 
-/*
+/**
  * Helper method to get the value associated with input "index"(a.k.a array
  * offset)
  */
@@ -63,7 +63,7 @@ ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueAt(int index) const {
 /*****************************************************************************
  * LOOKUP
  *****************************************************************************/
- /*
+ /**
   * Find and return the child pointer(page_id) which points to the child page
   * that contains input "key"
   * Start the search from the second key(the first key should always be invalid)
@@ -83,7 +83,7 @@ ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType& key, const KeyCo
 /*****************************************************************************
  * INSERTION
  *****************************************************************************/
- /*
+ /**
   * Populate new root page with old_value + new_key & new_value
   * When the insertion cause overflow from leaf page all the way upto the root
   * page, you should create a new root page and populate its elements.
@@ -98,7 +98,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::PopulateNewRoot(const ValueType& old_value,
   SetSize(2);
 }
 
-/*
+/**
  * Insert new_key & new_value pair right after the pair with its value ==
  * old_value
  * @return:  new size after insertion
@@ -121,8 +121,9 @@ int B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertNodeAfter(const ValueType& old_value, 
 /*****************************************************************************
  * SPLIT
  *****************************************************************************/
- /*
+ /**
   * Remove half of key & value pairs from this page to "recipient" page
+  * NOTE: Without process next_page
   */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(BPlusTreeInternalPage* recipient,
@@ -131,7 +132,8 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(BPlusTreeInternalPage* recipient
   this->IncreaseSize(GetMinSize() - GetSize());
 }
 
-/* Copy entries into me, starting from {items} and copy {size} entries.
+/**
+ * Copy entries into me, starting from {items} and copy {size} entries.
  * Since it is an internal page, for all entries (pages) moved, their parents page now changes to me.
  * So I need to 'adopt' them by changing their parent page id, which needs to be persisted with BufferPoolManger
  */
@@ -157,7 +159,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyNFrom(MappingType* items, int size, Buf
 /*****************************************************************************
  * REMOVE
  *****************************************************************************/
- /*
+ /**
   * Remove the key & value pair in internal page according to input index(a.k.a
   * array offset)
   * NOTE: store key&value pair continuously after deletion
@@ -168,11 +170,11 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Remove(int index) {
     array_[i].first = array_[i + 1].first;
     array_[i].second = array_[i + 1].second;
   }
-  array_[0].first = INVALID_PAGE_ID;
+  // array_[0].first = INVALID_PAGE_ID;
   IncreaseSize(-1);
 }
 
-/*
+/**
  * Remove the only key & value pair in internal page and return the value
  * NOTE: only call this method within AdjustRoot()(in b_plus_tree.cpp)
  */
@@ -186,7 +188,7 @@ ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::RemoveAndReturnOnlyChild() {
 /*****************************************************************************
  * MERGE
  *****************************************************************************/
- /*
+ /**
   * Remove all of key & value pairs from this page to "recipient" page.
   * The middle_key is the separation key you should get from the parent. You need
   * to make sure the middle key is added to the recipient to maintain the invariant.
@@ -204,7 +206,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllTo(BPlusTreeInternalPage* recipient,
 /*****************************************************************************
  * REDISTRIBUTE
  *****************************************************************************/
- /*
+ /**
   * Remove the first key & value pair from this page to tail of "recipient" page.
   *
   * The middle_key is the separation key you should get from the parent. You need
@@ -220,7 +222,8 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveFirstToEndOf(BPlusTreeInternalPage* rec
   Remove(0);
 }
 
-/* Append an entry at the end.
+/**
+ * Append an entry at the end.
  * Since it is an internal page, the moved entry(page)'s parent needs to be updated.
  * So I need to 'adopt' it by changing its parent page id, which needs to be persisted with BufferPoolManger
  */
@@ -239,7 +242,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyLastFrom(const MappingType& pair, Buffe
   }
 }
 
-/*
+/**
  * Remove the last key & value pair from this page to head of "recipient" page.
  * You need to handle the original dummy key properly, e.g. updating recipient’s array to position the middle_key at the
  * right place.
@@ -254,7 +257,8 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveLastToFrontOf(BPlusTreeInternalPage* re
   IncreaseSize(-1);
 }
 
-/* Append an entry at the beginning.
+/**
+ * Append an entry at the beginning.
  * Since it is an internal page, the moved entry(page)'s parent needs to be updated.
  * So I need to 'adopt' it by changing its parent page id, which needs to be persisted with BufferPoolManger
  */

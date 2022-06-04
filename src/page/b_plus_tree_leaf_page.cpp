@@ -113,6 +113,7 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &valu
  *****************************************************************************/
 /**
  * Remove half of key & value pairs from this page to "recipient" page
+ * NOTE: Without process next_page
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *recipient) {
@@ -122,8 +123,6 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *recipient) {
   //   recipient->array_[j].second = this->array_[i].second;
   // }
   recipient->CopyNFrom(array_ + this->GetMinSize(), GetSize() - GetMinSize());
-  recipient->SetNextPageId(this->GetNextPageId());
-  this->SetNextPageId(recipient->GetPageId());
   this->IncreaseSize(GetMinSize() - GetSize());
 }
 
