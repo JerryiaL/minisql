@@ -71,6 +71,17 @@ public:
     out << "}" << std::endl;
   }
 
+  void PrintTree() {
+    if (IsEmpty()) {
+      return;
+    }
+    std::cout << "digraph G {" << std::endl;
+    Page *root_page = buffer_pool_manager_->FetchPage(root_page_id_);
+    BPlusTreePage *node = reinterpret_cast<BPlusTreePage *>(root_page);
+    ToGraph(node, buffer_pool_manager_);
+    std::cout << "}" << std::endl;
+  }
+
 private:
   void StartNewTree(const KeyType &key, const ValueType &value);
 
@@ -98,6 +109,8 @@ private:
 
   /* Debug Routines for FREE!! */
   void ToGraph(BPlusTreePage *page, BufferPoolManager *bpm, std::ofstream &out) const;
+
+  void ToGraph(BPlusTreePage *page, BufferPoolManager *bpm) const;
 
   void ToString(BPlusTreePage *page, BufferPoolManager *bpm) const;
 
