@@ -71,7 +71,7 @@ ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueAt(int index) const {
 INDEX_TEMPLATE_ARGUMENTS
 ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType& key, const KeyComparator& comparator) const {
   int i;
-  for (i = 1; i < GetMaxSize(); i++) {
+  for (i = 1; i < GetSize(); i++) {
     if (comparator(array_[i].first, key) > 0) {
       break;
     }

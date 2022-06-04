@@ -96,14 +96,20 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &valu
     return GetSize();
   }
   IncreaseSize(1);
-  for (int i = GetSize() - 1; i > 0; i--) {
-    array_[i].first = array_[i - 1].first;
-    array_[i].second = array_[i - 1].second;
-    if (comparator(key, array_[i - 1].first) < 0) {
-      array_[i - 1].first = key;
-      array_[i - 1].second = value;
+  bool inserted = false;
+  for (int i = GetSize() - 1; !inserted && i > 0; i--) {
+    if (comparator(key, array_[i - 1].first) > 0) {
+      array_[i].first = key;
+      array_[i].second = value;
+      inserted = true;
       break;
     }
+    array_[i].first = array_[i - 1].first;
+    array_[i].second = array_[i - 1].second;
+  }
+  if (!inserted) {
+    array_[0].first = key;
+    array_[0].second = value;
   }
   return GetSize();
 }
