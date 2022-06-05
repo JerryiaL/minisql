@@ -686,6 +686,95 @@ void BPLUSTREE_TYPE::ToGraph(BPlusTreePage* page, BufferPoolManager* bpm, std::o
   bpm->UnpinPage(page->GetPageId(), false);
 }
 
+INDEX_TEMPLATE_ARGUMENTS
+void BPLUSTREE_TYPE::ToGraph(BPlusTreePage* page, BufferPoolManager* bpm) const {
+  std::string leaf_prefix("LEAF_");
+  std::string internal_prefix("INT_");
+  if (page->IsLeafPage()) {
+    auto* leaf = reinterpret_cast<LeafPage*>(page);
+    // Print node name
+    std::cout << leaf_prefix << leaf->GetPageId();
+    // Print node properties
+    std::cout << "[shape=plain color=green ";
+    // Print data of the node
+    std::cout << "label=<<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\">\n";
+    // Print data
+    std::cout << "<TR><TD COLSPAN=\"" << leaf->GetSize() << "\">P=" << leaf->GetPageId()
+      << ",Parent=" << leaf->GetParentPageId() << "</TD></TR>\n";
+    std::cout << "<TR><TD COLSPAN=\"" << leaf->GetSize() << "\">"
+      << "max_size=" << leaf->GetMaxSize() << ",min_size=" << leaf->GetMinSize() << ",size=" << leaf->GetSize()
+      << "</TD></TR>\n";
+    std::cout << "<TR>";
+    for (int i = 0; i < leaf->GetSize(); i++) {
+      std::cout << "<TD>" << leaf->KeyAt(i) << "</TD>\n";
+    }
+    std::cout << "</TR>";
+    // Print table end
+    std::cout << "</TABLE>>];\n";
+    // Print Leaf node link if there is a next page
+    if (leaf->GetNextPageId() != INVALID_PAGE_ID) {
+      std::cout << leaf_prefix << leaf->GetPageId() << " -> " << leaf_prefix << leaf->GetNextPageId() << ";\n";
+      std::cout << "{rank=same " << leaf_prefix << leaf->GetPageId() << " " << leaf_prefix << leaf->GetNextPageId()
+        << "};\n";
+    }
+
+    // Print parent links if there is a parent
+    if (leaf->GetParentPageId() != INVALID_PAGE_ID) {
+      std::cout << internal_prefix << leaf->GetParentPageId() << ":p" << leaf->GetPageId() << " -> " << leaf_prefix
+        << leaf->GetPageId() << ";\n";
+    }
+  }
+  else {
+    auto* inner = reinterpret_cast<InternalPage*>(page);
+    // Print node name
+    std::cout << internal_prefix << inner->GetPageId();
+    // Print node properties
+    std::cout << "[shape=plain color=pink ";  // why not?
+    // Print data of the node
+    std::cout << "label=<<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\">\n";
+    // Print data
+    std::cout << "<TR><TD COLSPAN=\"" << inner->GetSize() << "\">P=" << inner->GetPageId()
+      << ",Parent=" << inner->GetParentPageId() << "</TD></TR>\n";
+    std::cout << "<TR><TD COLSPAN=\"" << inner->GetSize() << "\">"
+      << "max_size=" << inner->GetMaxSize() << ",min_size=" << inner->GetMinSize() << ",size=" << inner->GetSize()
+      << "</TD></TR>\n";
+    std::cout << "<TR>";
+    for (int i = 0; i < inner->GetSize(); i++) {
+      std::cout << "<TD PORT=\"p" << inner->ValueAt(i) << "\">";
+      if (i > 0) {
+        std::cout << inner->KeyAt(i);
+      }
+      else {
+        std::cout << " ";
+      }
+      std::cout << "</TD>\n";
+    }
+    std::cout << "</TR>";
+    // Print table end
+    std::cout << "</TABLE>>];\n";
+    // Print Parent link
+    if (inner->GetParentPageId() != INVALID_PAGE_ID) {
+      std::cout << internal_prefix << inner->GetParentPageId() << ":p" << inner->GetPageId() << " -> "
+        << internal_prefix
+        << inner->GetPageId() << ";\n";
+    }
+    // Print leaves
+    for (int i = 0; i < inner->GetSize(); i++) {
+      auto child_page = reinterpret_cast<BPlusTreePage*>(bpm->FetchPage(inner->ValueAt(i))->GetData());
+      ToGraph(child_page, bpm);
+      if (i > 0) {
+        auto sibling_page = reinterpret_cast<BPlusTreePage*>(bpm->FetchPage(inner->ValueAt(i - 1))->GetData());
+        if (!sibling_page->IsLeafPage() && !child_page->IsLeafPage()) {
+          std::cout << "{rank=same " << internal_prefix << sibling_page->GetPageId() << " " << internal_prefix
+            << child_page->GetPageId() << "};\n";
+        }
+        bpm->UnpinPage(sibling_page->GetPageId(), false);
+      }
+    }
+  }
+  bpm->UnpinPage(page->GetPageId(), false);
+}
+
 /**
  * This function is for debug only, you don't need to modify
  */
