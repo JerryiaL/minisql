@@ -64,12 +64,6 @@ INDEX_TEMPLATE_ARGUMENTS INDEXITERATOR_TYPE& INDEXITERATOR_TYPE::operator++() {
   return *this;
 }
 
-INDEX_TEMPLATE_ARGUMENTS INDEXITERATOR_TYPE INDEXITERATOR_TYPE::operator++(int) {
-  IndexIterator ret_val = *this;
-  ++(*this);
-  return ret_val;
-}
-
 INDEX_TEMPLATE_ARGUMENTS
 bool INDEXITERATOR_TYPE::operator==(const IndexIterator& itr) const {
   return bpm_ == itr.bpm_ && leaf_ == itr.leaf_ && index_ == itr.index_;

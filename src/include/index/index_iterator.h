@@ -22,8 +22,6 @@ public:
   /** Move to the next key/value pair.*/
   IndexIterator &operator++();
 
-  IndexIterator operator++(int);
-
   /** Return whether two iterators are equal */
   bool operator==(const IndexIterator &itr) const;
 
