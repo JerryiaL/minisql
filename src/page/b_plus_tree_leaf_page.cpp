@@ -124,8 +124,8 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *recipient) {
   //   recipient->array_[j].first = this->array_[i].first;
   //   recipient->array_[j].second = this->array_[i].second;
   // }
-  recipient->CopyNFrom(array_ + this->GetMinSize(), GetSize() - GetMinSize());
-  this->IncreaseSize(GetMinSize() - GetSize());
+  recipient->CopyNFrom(array_ + this->GetMinSize(), GetMaxSize() - GetMinSize());
+  this->IncreaseSize(GetMinSize() - GetMaxSize());
 }
 
 /**

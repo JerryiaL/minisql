@@ -92,9 +92,10 @@ bool BPLUSTREE_TYPE::GetValue(const KeyType& key, std::vector<ValueType>& result
   LeafPage* leaf_node = reinterpret_cast<LeafPage*>(FindLeafPage(key,false)->GetData());
   ValueType value;
   bool ret = leaf_node->Lookup(key, value, comparator_);
+  buffer_pool_manager_->UnpinPage(leaf_node->GetPageId(), false);  
+  if (!ret) return false;
   result.push_back(value);
-  buffer_pool_manager_->UnpinPage(leaf_node->GetPageId(), false);
-  return ret;  
+  return true;  
 }
 
 /*****************************************************************************
@@ -320,7 +321,7 @@ bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N* node, Transaction* transaction) {
   if (node->IsRootPage()) {
     return AdjustRoot(node);
   }
-  page_id_t parent_id, prev_id, next_id;
+  page_id_t parent_id, prev_id = INVALID_PAGE_ID, next_id = INVALID_PAGE_ID;
   N* prev_node;
   N* next_node;
   Page* prev_page;
@@ -369,6 +370,7 @@ bool BPLUSTREE_TYPE::CoalesceOrRedistribute(N* node, Transaction* transaction) {
     buffer_pool_manager_->UnpinPage(next_id, true);
     return false;
   }
+  return false;
 }
 
 /**

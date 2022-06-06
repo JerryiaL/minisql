@@ -128,7 +128,7 @@ int B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertNodeAfter(const ValueType& old_value, 
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(BPlusTreeInternalPage* recipient,
   BufferPoolManager* buffer_pool_manager) {
-  recipient->CopyNFrom(array_ + this->GetMinSize(), GetSize() - GetMinSize(), buffer_pool_manager);
+  recipient->CopyNFrom(array_ + this->GetMinSize(), GetMaxSize() - GetMinSize(), buffer_pool_manager);
   this->IncreaseSize(GetMinSize() - GetSize());
 }
 
@@ -270,14 +270,14 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyFirstFrom(const MappingType& pair, Buff
     array_[i].second = array_[i - 1].second;
   }
   array_[0].second = pair.second;
-  //the key used to be invalid and now not
-  page_id_t page_id = array_[1].second;
-  auto* page = buffer_pool_manager->FetchPage(page_id);
-  if (page != nullptr) {
-    auto* node = reinterpret_cast<BPlusTreeInternalPage*>(page->GetData());
-    array_[1].first = node->array_[1].first;
-    buffer_pool_manager->UnpinPage(page_id, true);
-  }
+  // //the key used to be invalid and now not
+  // page_id_t page_id = array_[1].second;
+  // auto* page = buffer_pool_manager->FetchPage(page_id);
+  // if (page != nullptr) {
+  //   auto* node = reinterpret_cast<BPlusTreeInternalPage*>(page->GetData());
+  //   array_[1].first = node->array_[1].first;
+  //   buffer_pool_manager->UnpinPage(page_id, true);
+  // }
   //'adopt' pair by changing its parent page id
   page_id = pair.second;
   page = buffer_pool_manager->FetchPage(page_id);
