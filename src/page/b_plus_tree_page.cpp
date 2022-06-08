@@ -5,7 +5,7 @@
  * Page type enum class is defined in b_plus_tree_page.h
  */
 bool BPlusTreePage::IsLeafPage() const {
-  if (page_type_ == IndexPageType::LEAF_PAGE) 
+  if (page_type_ == IndexPageType::LEAF_PAGE)
     return true;
   return false;
 }
