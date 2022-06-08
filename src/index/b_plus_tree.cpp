@@ -9,12 +9,17 @@ INDEX_TEMPLATE_ARGUMENTS
 BPLUSTREE_TYPE::BPlusTree(index_id_t index_id, BufferPoolManager* buffer_pool_manager, const KeyComparator& comparator,
   int leaf_max_size, int internal_max_size)
   : index_id_(index_id),
-  root_page_id_(INVALID_PAGE_ID),
   buffer_pool_manager_(buffer_pool_manager),
   comparator_(comparator),
   leaf_max_size_(leaf_max_size),
   internal_max_size_(internal_max_size) {
-
+  Page* page = buffer_pool_manager_->FetchPage(INDEX_ROOTS_PAGE_ID);
+  ASSERT(page != nullptr, "root fetch fail");
+  IndexRootsPage* node = reinterpret_cast<IndexRootsPage*>(page->GetData());
+  bool find_root_status = node->GetRootId(index_id, &root_page_id_);
+  if (!find_root_status)
+    root_page_id_ = INVALID_PAGE_ID;
+  buffer_pool_manager_->UnpinPage(page->GetPageId(), true);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
@@ -89,7 +94,7 @@ bool BPLUSTREE_TYPE::GetValue(const KeyType& key, std::vector<ValueType>& result
   // result.push_back(value);
   // buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
   // return ret;
-  LeafPage* leaf_node = reinterpret_cast<LeafPage*>(FindLeafPage(key,false)->GetData());
+  LeafPage* leaf_node = reinterpret_cast<LeafPage*>(FindLeafPage(key, false)->GetData());
   ValueType value;
   bool ret = leaf_node->Lookup(key, value, comparator_);
   buffer_pool_manager_->UnpinPage(leaf_node->GetPageId(), false);
@@ -199,23 +204,23 @@ N* BPLUSTREE_TYPE::Split(N* node) {
   N* ret_recipient = nullptr;
   if (node->IsLeafPage()) {
     assert(node->IsLeafPage());
-    LeafPage* leaf_node = reinterpret_cast<LeafPage *>(node);
+    LeafPage* leaf_node = reinterpret_cast<LeafPage*>(node);
     assert(leaf_node->IsLeafPage());
 
-    LeafPage* recipient = reinterpret_cast<LeafPage *>(new_page->GetData());
+    LeafPage* recipient = reinterpret_cast<LeafPage*>(new_page->GetData());
     recipient->Init(new_page_id, leaf_node->GetParentPageId(), leaf_max_size_);
     leaf_node->MoveHalfTo(recipient);
-    ret_recipient = reinterpret_cast<N *>(recipient);
+    ret_recipient = reinterpret_cast<N*>(recipient);
   }
   else {
     assert(!node->IsLeafPage());
-    InternalPage* internal_node = reinterpret_cast<InternalPage *>(node);
+    InternalPage* internal_node = reinterpret_cast<InternalPage*>(node);
     assert(!internal_node->IsLeafPage());
 
-    InternalPage* recipient = reinterpret_cast<InternalPage *>(new_page->GetData());
+    InternalPage* recipient = reinterpret_cast<InternalPage*>(new_page->GetData());
     recipient->Init(new_page_id, internal_node->GetParentPageId(), internal_max_size_);
     internal_node->MoveHalfTo(recipient, buffer_pool_manager_);
-    ret_recipient = reinterpret_cast<N *>(recipient);
+    ret_recipient = reinterpret_cast<N*>(recipient);
   }
   return ret_recipient;
 }
@@ -253,7 +258,7 @@ void BPLUSTREE_TYPE::InsertIntoParent(BPlusTreePage* old_node, const KeyType& ke
   Page* parent_page = buffer_pool_manager_->FetchPage(parent_page_id);
   ASSERT(parent_page != nullptr, "out of memory");
   assert(parent_page->GetPinCount() == 1);
-  InternalPage* parent = reinterpret_cast<InternalPage *>(parent_page->GetData());
+  InternalPage* parent = reinterpret_cast<InternalPage*>(parent_page->GetData());
 
   if (parent->GetSize() < parent->GetMaxSize()) {
     parent->InsertNodeAfter(old_node->GetPageId(), key, new_node->GetPageId());
@@ -307,15 +312,15 @@ void BPLUSTREE_TYPE::Remove(const KeyType& key, Transaction* transaction) {
   }
   else {
     page_id_t parent_id = leaf_node->GetParentPageId();
-    if (parent_id != INVALID_PAGE_ID) { 
+    if (parent_id != INVALID_PAGE_ID) {
       Page* parent_page = buffer_pool_manager_->FetchPage(parent_id);
       InternalPage* parent_node = reinterpret_cast<InternalPage*>(parent_page->GetData());
       KeyType newkey = leaf_node->GetItem(0).first;
       if (leaf_node->KeyIndex(newkey, comparator_) == 0) {
         int index = parent_node->ValueIndex(leaf_node->GetPageId());
-        parent_node->SetKeyAt(index, newkey); 
+        parent_node->SetKeyAt(index, newkey);
       }
-      buffer_pool_manager_->UnpinPage(parent_page->GetPageId(), true); 
+      buffer_pool_manager_->UnpinPage(parent_page->GetPageId(), true);
     }
   }
 
