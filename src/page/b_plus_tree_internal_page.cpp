@@ -230,16 +230,15 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveFirstToEndOf(BPlusTreeInternalPage* rec
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyLastFrom(const MappingType& pair, BufferPoolManager* buffer_pool_manager) {
   IncreaseSize(1);
-  array_[GetSize()].first = pair.first;
-  array_[GetSize()].second = pair.second;
+  array_[GetSize() - 1].first = pair.first;
+  array_[GetSize() - 1].second = pair.second;
 
   page_id_t page_id = pair.second;
   auto* page = buffer_pool_manager->FetchPage(page_id);
-  if (page != nullptr) {
-    auto* node = reinterpret_cast<BPlusTreePage*>(page->GetData());
-    node->SetParentPageId(this->GetPageId());
-    buffer_pool_manager->UnpinPage(page_id, true);
-  }
+  assert(page != nullptr);
+  auto* node = reinterpret_cast<BPlusTreePage*>(page->GetData());
+  node->SetParentPageId(this->GetPageId());
+  buffer_pool_manager->UnpinPage(page_id, true);
 }
 
 /**
@@ -279,8 +278,8 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyFirstFrom(const MappingType& pair, Buff
   //   buffer_pool_manager->UnpinPage(page_id, true);
   // }
   //'adopt' pair by changing its parent page id
-  page_id = pair.second;
-  page = buffer_pool_manager->FetchPage(page_id);
+  page_id_t page_id = pair.second;
+  auto* page = buffer_pool_manager->FetchPage(page_id);
   if (page != nullptr) {
     auto* node = reinterpret_cast<BPlusTreePage*>(page->GetData());
     node->SetParentPageId(this->GetPageId());

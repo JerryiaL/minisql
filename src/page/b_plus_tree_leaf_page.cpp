@@ -7,11 +7,11 @@
  * HELPER METHODS AND UTILITIES
  *****************************************************************************/
 
-/**
- * Init method after creating a new leaf page
- * Including set page type, set current size to zero, set page id/parent id, set
- * next page id and set max size
- */
+ /**
+  * Init method after creating a new leaf page
+  * Including set page type, set current size to zero, set page id/parent id, set
+  * next page id and set max size
+  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id, int max_size) {
   SetPageType(IndexPageType::LEAF_PAGE);
@@ -83,10 +83,10 @@ const MappingType &B_PLUS_TREE_LEAF_PAGE_TYPE::GetItem(int index) {
 /*****************************************************************************
  * INSERTION
  *****************************************************************************/
-/**
- * Insert key & value pair into leaf page ordered by key
- * @return page size after insertion
- */
+ /**
+  * Insert key & value pair into leaf page ordered by key
+  * @return page size after insertion
+  */
 INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) {
   int key_index = KeyIndex(key, comparator);
@@ -99,7 +99,7 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &valu
   if(comparator(array_[key_index].first, key) == 0){
     return this->GetSize();
   }
- 
+
   for(int i = GetSize()-1 ;i >= key_index; i--){
     array_[i+1].first = array_[i].first;
     array_[i+1].second = array_[i].second;
@@ -113,10 +113,10 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &valu
 /*****************************************************************************
  * SPLIT
  *****************************************************************************/
-/**
- * Remove half of key & value pairs from this page to "recipient" page
- * NOTE: Without process next_page
- */
+ /**
+  * Remove half of key & value pairs from this page to "recipient" page
+  * NOTE: Without process next_page
+  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *recipient) {
   // recipient->IncreaseSize(GetSize() - GetMinSize());
@@ -145,11 +145,11 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyNFrom(MappingType *items, int size) {
 /*****************************************************************************
  * LOOKUP
  *****************************************************************************/
-/**
- * For the given key, check to see whether it exists in the leaf page. If it
- * does, then store its corresponding value in input "value" and return true.
- * If the key does not exist, then return false
- */
+ /**
+  * For the given key, check to see whether it exists in the leaf page. If it
+  * does, then store its corresponding value in input "value" and return true.
+  * If the key does not exist, then return false
+  */
 INDEX_TEMPLATE_ARGUMENTS
 bool B_PLUS_TREE_LEAF_PAGE_TYPE::Lookup(const KeyType &key, ValueType &value, const KeyComparator &comparator) const {
   int start = 0, end = GetSize() - 1;
@@ -170,41 +170,36 @@ bool B_PLUS_TREE_LEAF_PAGE_TYPE::Lookup(const KeyType &key, ValueType &value, co
 /*****************************************************************************
  * REMOVE
  *****************************************************************************/
-/**
- * First look through leaf page to see whether delete key exist or not. If
- * exist, perform deletion, otherwise return immediately.
- * NOTE: ensure all key & value pairs store in continuous storage.
- * @return node size after deletion
- */
+ /**
+  * First look through leaf page to see whether delete key exist or not. If
+  * exist, perform deletion, otherwise return immediately.
+  * NOTE: ensure all key & value pairs store in continuous storage.
+  * @return node size after deletion
+  */
 INDEX_TEMPLATE_ARGUMENTS
-int B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveAndDeleteRecord(const KeyType &key, const KeyComparator &comparator) {
+int B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveAndDeleteRecord(const KeyType& key, const KeyComparator& comparator) {
   int key_index = KeyIndex(key, comparator);
-  if(key_index == GetSize()){
-    return GetSize();
+  if (key_index == GetSize() || comparator(key, KeyAt(key_index)) != 0) {
+    ASSERT(false, "Leaf::RemoveAndDeleteRecord: not found! ");
   }
-  else if(comparator(key, KeyAt(key_index))){
-    return GetSize();
-  }
-  else{
-    for(int i=key_index;i<GetSize()-1;i++){
-      array_[i].first = array_[i+1].first;
-      array_[i].second = array_[i+1].second;      
+  else {
+    for (int i = key_index; i < GetSize() - 1; i++) {
+      array_[i].first = array_[i + 1].first;
+      array_[i].second = array_[i + 1].second;
     }
     IncreaseSize(-1);
-    return GetSize();
   }
-
   return GetSize();
 }
 
 /*****************************************************************************
  * MERGE
  *****************************************************************************/
-/**
- * Remove all of key & value pairs from this page to "recipient" page. Don't forget
- * to update the next_page id in the sibling page
- * NOTE: Should process next page id !!
- */
+ /**
+  * Remove all of key & value pairs from this page to "recipient" page. Don't forget
+  * to update the next_page id in the sibling page
+  * NOTE: Should process next page id !!
+  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveAllTo(BPlusTreeLeafPage *recipient) {
   recipient->CopyNFrom(array_, GetSize());
@@ -215,10 +210,10 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveAllTo(BPlusTreeLeafPage *recipient) {
 /*****************************************************************************
  * REDISTRIBUTE
  *****************************************************************************/
-/**
- * Remove the first key & value pair from this page to end of "recipient" page.
- *
- */
+ /**
+  * Remove the first key & value pair from this page to end of "recipient" page.
+  *
+  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveFirstToEndOf(BPlusTreeLeafPage *recipient) {
   recipient->CopyLastFrom(array_[0]);
