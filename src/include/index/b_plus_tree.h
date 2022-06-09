@@ -10,6 +10,7 @@
 #include "page/b_plus_tree_page.h"
 #include "transaction/transaction.h"
 #include "index/index_iterator.h"
+#include "page/index_roots_page.h"
 
 #define BPLUSTREE_TYPE BPlusTree<KeyType, ValueType, KeyComparator>
 
@@ -70,6 +71,17 @@ public:
     out << "}" << std::endl;
   }
 
+  void PrintTree() {
+    if (IsEmpty()) {
+      return;
+    }
+    std::cout << "digraph G {" << std::endl;
+    Page *root_page = buffer_pool_manager_->FetchPage(root_page_id_);
+    BPlusTreePage *node = reinterpret_cast<BPlusTreePage *>(root_page);
+    ToGraph(node, buffer_pool_manager_);
+    std::cout << "}" << std::endl;
+  }
+
 private:
   void StartNewTree(const KeyType &key, const ValueType &value);
 
@@ -98,6 +110,8 @@ private:
   /* Debug Routines for FREE!! */
   void ToGraph(BPlusTreePage *page, BufferPoolManager *bpm, std::ofstream &out) const;
 
+  void ToGraph(BPlusTreePage *page, BufferPoolManager *bpm) const;
+
   void ToString(BPlusTreePage *page, BufferPoolManager *bpm) const;
 
   // member variable
@@ -107,6 +121,7 @@ private:
   KeyComparator comparator_;
   int leaf_max_size_;
   int internal_max_size_;
+  vector<page_id_t> destroy_internal_pages_id;
 };
 
 #endif  // MINISQL_B_PLUS_TREE_H

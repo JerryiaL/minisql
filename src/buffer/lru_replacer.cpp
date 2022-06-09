@@ -14,11 +14,10 @@ bool LRUReplacer::Victim(frame_id_t *frame_id) {
   if (lru_map_.empty()) {
     return false;
   }
-  frame_id = (frame_id_t *)malloc(0 * (*frame_id));
   auto last = tail->prior;
   tail->prior = last->prior;
   last->prior->next = tail;
-  frame_id = &(last->data);
+  *frame_id = last->data;
   lru_map_.erase(last->data);
   return true;
 }
@@ -34,19 +33,16 @@ void LRUReplacer::Pin(frame_id_t frame_id) {
 
 void LRUReplacer::Unpin(frame_id_t frame_id) {
   doubleLinkedListNode* cur;
-  if (lru_map_.find(frame_id) != lru_map_.end()) {
-    auto cur = lru_map_[frame_id];
-    cur->prior->next = cur->next;
-    cur->next->prior = cur->prior;
-    printf("frame_id: %d, Already Unpinned\n", frame_id);
-  } else {
+  if (lru_map_.find(frame_id) != lru_map_.end()) {} 
+  else 
+  {
     cur = new doubleLinkedListNode(frame_id);
+    head->next->prior = cur;
+    cur->next = head->next;
+    head->next = cur;
+    cur->prior = head;
+    lru_map_[frame_id] = cur;
   }
-  head->next->prior = cur;
-  cur->next = head->next;
-  head->next = cur;
-  cur->prior = head;
-  lru_map_[frame_id] = cur;
 }
 
 size_t LRUReplacer::Size() {

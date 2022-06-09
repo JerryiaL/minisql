@@ -1,5 +1,5 @@
 #include <unordered_set>
-
+#include "glog/logging.h"
 #include "gtest/gtest.h"
 #include "storage/disk_manager.h"
 
@@ -33,13 +33,32 @@ TEST(DiskManagerTest, BitMapPageTest) {
   ASSERT_FALSE(bitmap->AllocatePage(ofs));
 }
 
-TEST(DiskManagerTest, DISABLED_FreePageAllocationTest) {
+TEST(DiskManagerTest, FreePageAllocationTest) {
   std::string db_name = "disk_test.db";
   DiskManager *disk_mgr = new DiskManager(db_name);
   int extent_nums = 2;
   for (uint32_t i = 0; i < DiskManager::BITMAP_SIZE * extent_nums; i++) {
+    printf("%d\n",i);
     page_id_t page_id = disk_mgr->AllocatePage();
     DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(disk_mgr->GetMetaData());
+    if(i == DiskManager::BITMAP_SIZE * extent_nums - 1){
+      std::string str = "123";
+      char val[PAGE_SIZE];
+      for(int j = 0; j < int(str.length());j++){
+        val[j] = str[j];
+      }
+      //val[str.length()] = '\0';
+      LOG(INFO) << "given string: " << str << "given val: "<< val << std::endl;
+      //printf("flag1\n");
+      disk_mgr->WritePage(page_id,val);
+      char get_val[PAGE_SIZE];
+      //printf("flag2\n");
+      disk_mgr->ReadPage(page_id,get_val);
+      printf("%s",get_val);
+      LOG(INFO) << "given val: " << val << "val read: "<< get_val << std::endl;
+      EXPECT_EQ(0,memcmp(get_val,val,PAGE_SIZE));
+    }
+    
     EXPECT_EQ(i, page_id);
     EXPECT_EQ(i / DiskManager::BITMAP_SIZE + 1, meta_page->GetExtentNums());
     EXPECT_EQ(i + 1, meta_page->GetAllocatedPages());

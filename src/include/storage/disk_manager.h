@@ -11,6 +11,7 @@
 #include "page/bitmap_page.h"
 #include "page/disk_file_meta_page.h"
 
+#define MAX_EXTENT 8
 /**
  * DiskManager takes care of the allocation and de allocation of pages within a database. It performs the reading and
  * writing of pages to and from disk, providing a logical file layer within the context of a database management system.
@@ -23,7 +24,9 @@ class DiskManager {
 public:
   explicit DiskManager(const std::string &db_file);
 
-  ~DiskManager() {
+~DiskManager() {
+    auto meta = reinterpret_cast<char *>(meta_data_);
+    WritePhysicalPage(0, meta);
     if (!closed) {
       Close();
     }
@@ -66,10 +69,8 @@ public:
    * Get Meta Page
    * Note: Used only for debug
    */
-  char *GetMetaData() {
-    return meta_data_;
-  }
-
+  char *GetMetaData();
+  
   static constexpr size_t BITMAP_SIZE = BitmapPage<PAGE_SIZE>::GetMaxSupportedSize();
 
 private:
@@ -101,6 +102,7 @@ private:
   std::recursive_mutex db_io_latch_;
   bool closed{false};
   char meta_data_[PAGE_SIZE];
+
 };
 
 #endif

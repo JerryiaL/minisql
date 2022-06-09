@@ -17,7 +17,7 @@
  *
  * Internal page format (keys are stored in increasing order):
  *  --------------------------------------------------------------------------
- * | HEADER | KEY(1)+PAGE_ID(1) | KEY(2)+PAGE_ID(2) | ... | KEY(n)+PAGE_ID(n) |
+ * | HEADER | KEY(0)+PAGE_ID(0) | KEY(1)+PAGE_ID(1) | ... | KEY(max_size-1)+PAGE_ID(max_size-1) |
  *  --------------------------------------------------------------------------
  */
 INDEX_TEMPLATE_ARGUMENTS

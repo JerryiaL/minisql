@@ -61,11 +61,22 @@ public:
 
 private:
   // member variable, attributes that both internal and leaf page share
+
+  // 标记数据页是中间结点还是叶子结点
   [[maybe_unused]] IndexPageType page_type_;
+
+  // 数据页的日志序列号，目前不会用到，如果之后感兴趣做Crash Recovery相关的内容需要用到
   [[maybe_unused]] lsn_t lsn_;
+
+  // 当前结点中存储Key-Value键值对的数量
   [[maybe_unused]] int size_;
+
+  // 当前结点最多能够容纳Key-Value键值对的数量
   [[maybe_unused]] int max_size_;
+
+  // 父结点对应数据页的page_id
   [[maybe_unused]] page_id_t parent_page_id_;
+  
   [[maybe_unused]] page_id_t page_id_;
 };
 

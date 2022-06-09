@@ -39,5 +39,6 @@
 #define ALLOC_P(Heap, Type) new(Heap->Allocate(sizeof(Type)))Type
 #define ALLOC_COLUMN(Heap) ALLOC(Heap, Column)
 
+#define ddebug(x) LOG(INFO) << #x << " = " << (x);
 
 #endif  // MINISQL_MACROS_H

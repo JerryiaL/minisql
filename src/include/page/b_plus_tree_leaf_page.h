@@ -10,7 +10,7 @@
 
  * Leaf page format (keys are stored in order):
  *  ----------------------------------------------------------------------
- * | HEADER | KEY(1) + RID(1) | KEY(2) + RID(2) | ... | KEY(n) + RID(n)
+ * | HEADER | KEY(0) + RID(0) | KEY(1) + RID(1) | ... | KEY(max_size-1) + RID(max_size-1)
  *  ----------------------------------------------------------------------
  *
  *  Header format (size in byte, 24 bytes in total):
