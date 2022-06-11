@@ -36,7 +36,13 @@ private:
   IndexMetadata() = delete;
 
   explicit IndexMetadata(const index_id_t index_id, const std::string &index_name,
-                         const table_id_t table_id, const std::vector<uint32_t> &key_map) {}
+                         const table_id_t table_id, const std::vector<uint32_t> &key_map)
+  {
+    index_id_ = index_id;
+    index_name_ = index_name;
+    table_id_ = table_id;
+    key_map_ = key_map;
+  }
 
 private:
   static constexpr uint32_t INDEX_METADATA_MAGIC_NUM = 344528;
@@ -62,9 +68,18 @@ public:
 
   void Init(IndexMetadata *meta_data, TableInfo *table_info, BufferPoolManager *buffer_pool_manager) {
     // Step1: init index metadata and table info
+    this->meta_data_ = meta_data;
+    this->table_info_ = table_info;
     // Step2: mapping index key to key schema
+    
+    /* Not sure*/
+    key_schema_ = key_schema_->ShallowCopySchema(table_info_->GetSchema(), meta_data_->key_map_, heap_);
+    LOG(INFO) << "key_schema_shallow copy is ok";
+    LOG(INFO) << "shallow copy result:" << key_schema_->GetColumnCount();
     // Step3: call CreateIndex to create the index
-    ASSERT(false, "Not Implemented yet.");
+    index_ = CreateIndex(buffer_pool_manager);
+    LOG(INFO) << "Create index is ok";
+    //ASSERT(false, "Not Implemented yet.");
   }
 
   inline Index *GetIndex() { return index_; }
@@ -82,8 +97,37 @@ private:
                          key_schema_{nullptr}, heap_(new SimpleMemHeap()) {}
 
   Index *CreateIndex(BufferPoolManager *buffer_pool_manager) {
-    ASSERT(false, "Not Implemented yet.");
-    return nullptr;
+    /* not sure what to do
+     * just have a try 
+    */
+    Index *ind = nullptr;
+    uint32_t index_total_len = 12; //for rowid and count
+    for(uint32_t i = 0; i < key_schema_->GetColumnCount(); i++)
+    {
+      index_total_len += 1;
+      index_total_len += key_schema_->GetColumn(i)->GetLength();
+    }
+    if(index_total_len <= 4)
+    {
+      ind = new BPlusTreeIndex<GenericKey<4>,RowId,GenericComparator<4>>(meta_data_->GetIndexId() ,key_schema_, buffer_pool_manager);
+    }
+    else if(index_total_len <= 8)
+    {
+      ind = new BPlusTreeIndex<GenericKey<8>,RowId,GenericComparator<8>>(meta_data_->GetIndexId() ,key_schema_, buffer_pool_manager);
+    }
+    else if(index_total_len <= 16)
+    {
+      ind = new BPlusTreeIndex<GenericKey<16>,RowId,GenericComparator<16>>(meta_data_->GetIndexId() ,key_schema_, buffer_pool_manager);
+    }
+    else if(index_total_len <= 32)
+    {
+      ind = new BPlusTreeIndex<GenericKey<32>,RowId,GenericComparator<32>>(meta_data_->GetIndexId() ,key_schema_, buffer_pool_manager);
+    }
+    else
+    {
+      ind = new BPlusTreeIndex<GenericKey<64>,RowId,GenericComparator<64>>(meta_data_->GetIndexId() ,key_schema_, buffer_pool_manager);
+    }
+    return ind;
   }
 
 private:
