@@ -38,6 +38,7 @@ void BPLUSTREE_TYPE::Destroy() {
 
   KeyType key;
   Page* leaf_page = FindLeafPage(key, true);
+  ASSERT(leaf_page, "leaf page is nullptr");
   LeafPage* leaf_node = reinterpret_cast<LeafPage*>(leaf_page->GetData());
   assert(leaf_node->IsLeafPage());
   page_id_t next_id = leaf_node->GetNextPageId();
@@ -94,7 +95,11 @@ bool BPLUSTREE_TYPE::GetValue(const KeyType& key, std::vector<ValueType>& result
   // result.push_back(value);
   // buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
   // return ret;
-  LeafPage* leaf_node = reinterpret_cast<LeafPage*>(FindLeafPage(key, false)->GetData());
+  auto leaf_page = FindLeafPage(key, false);
+  if (!leaf_page)
+    return false;
+  // ASSERT(leaf_page, "leaf page is nullptr");
+  LeafPage* leaf_node = reinterpret_cast<LeafPage*>(leaf_page->GetData());
   ValueType value;
   bool ret = leaf_node->Lookup(key, value, comparator_);
   buffer_pool_manager_->UnpinPage(leaf_node->GetPageId(), false);
@@ -151,7 +156,9 @@ void BPLUSTREE_TYPE::StartNewTree(const KeyType& key, const ValueType& value) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType& key, const ValueType& value, Transaction* transaction) {
-  LeafPage* leaf_node = reinterpret_cast<LeafPage*>(FindLeafPage(key, false)->GetData());
+  auto leaf_page = FindLeafPage(key, false);
+  ASSERT(leaf_page, "leaf page is nullptr");
+  LeafPage* leaf_node = reinterpret_cast<LeafPage*>(leaf_page->GetData());
   assert(leaf_node->IsLeafPage());
   ValueType lookup_value;
   if (leaf_node->Lookup(key, lookup_value, comparator_)) {
@@ -299,6 +306,7 @@ INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::Remove(const KeyType& key, Transaction* transaction) {
   if (root_page_id_ == INVALID_PAGE_ID) return;
   Page* leaf_page = FindLeafPage(key, false);
+  ASSERT(leaf_page, "leaf page is nullptr");
   LeafPage* leaf_node = reinterpret_cast<LeafPage*>(leaf_page->GetData());
   assert(leaf_node->IsLeafPage());
   ValueType lookup_value;
@@ -578,7 +586,9 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::End() {
   */
 INDEX_TEMPLATE_ARGUMENTS
 Page* BPLUSTREE_TYPE::FindLeafPage(const KeyType& key, bool leftMost) {
-  ASSERT(root_page_id_ != INVALID_PAGE_ID, "root_page_id is INVALID_PAGE_ID");
+  if (root_page_id_ == INVALID_PAGE_ID)
+    return nullptr;
+  // ASSERT(root_page_id_ != INVALID_PAGE_ID, "root_page_id is INVALID_PAGE_ID");
   Page* page = buffer_pool_manager_->FetchPage(root_page_id_);
   BPlusTreePage* node = reinterpret_cast<BPlusTreePage*>(page->GetData());
   ASSERT(node->IsRootPage(), "Not Root Page");
