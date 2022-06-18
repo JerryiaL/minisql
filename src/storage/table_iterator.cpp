@@ -35,7 +35,12 @@ TableIterator &TableIterator::operator++() {
   page->WUnlatch();
   table_heap_->buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
   if (next_rid->GetPageId() == INVALID_PAGE_ID) {
-    auto next_page = reinterpret_cast<TablePage *>(table_heap_->buffer_pool_manager_->FetchPage(page->GetNextPageId()));
+    auto next_page_id = page->GetNextPageId();
+    if (next_page_id == INVALID_FRAME_ID) {
+      row_->SetRowId(INVALID_ROWID);
+      return *this;
+    }
+    auto next_page = reinterpret_cast<TablePage *>(table_heap_->buffer_pool_manager_->FetchPage(next_page_id));
     next_page->WLatch();
     next_page->GetFirstTupleRid(next_rid);
     next_page->WUnlatch();
