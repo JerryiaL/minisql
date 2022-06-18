@@ -19,8 +19,11 @@ ExecuteEngine::ExecuteEngine() {
 
 
 bool RowId_compare(RowId x, RowId y){
-  if(x.GetSlotNum() < y.GetSlotNum())return true;
-  else return false;
+  if(x.GetPageId() < y.GetPageId())return true;
+  else if(x.GetPageId() == y.GetPageId()){
+    if(x.GetSlotNum() < y.GetSlotNum())return true;
+  }
+  return false;
 }
 
 dberr_t ExecuteEngine::Execute(pSyntaxNode ast, ExecuteContext *context) {
@@ -834,9 +837,17 @@ std::vector<RowId> ExecuteEngine::Condition(pSyntaxNode ast, std::string table_n
         Row* row = new Row(*Iterator);
         table_info->GetTableHeap()->GetTuple(row, NULL);
         if(type == kTypeFloat){
-          if(atof(row->GetField(idx)->GetData()) == atof(pointer->val_ ))res.push_back(Iterator->GetRowId());
+          Field field(type, (float)atof(pointer->val_));
+          if(row->GetField(idx)->CompareEquals(field))res.push_back(Iterator->GetRowId());
         }
-        else {if(strcmp(pointer->val_, row->GetField(idx)->GetData()) == 0)res.push_back(Iterator->GetRowId());}
+        else if(type == kTypeInt){
+          Field field(type, atoi(pointer->val_));
+          if(row->GetField(idx)->CompareEquals(field))res.push_back(Iterator->GetRowId());
+        }
+        else if(type == kTypeChar){
+          Field field(type, pointer->val_, ((std::string)pointer->val_).size(), false);
+          if(row->GetField(idx)->CompareEquals(field))res.push_back(Iterator->GetRowId());
+        }
         ++Iterator;
         delete row;
       }
@@ -892,9 +903,17 @@ std::vector<RowId> ExecuteEngine::Condition(pSyntaxNode ast, std::string table_n
         Row* row = new Row(*Iterator);
         table_info->GetTableHeap()->GetTuple(row, NULL);
         if(type == kTypeFloat){
-          if(atof(row->GetField(idx)->GetData()) != atof(pointer->val_ ))res.push_back(Iterator->GetRowId());
+          Field field(type, (float)atof(pointer->val_));
+          if(row->GetField(idx)->CompareNotEquals(field))res.push_back(Iterator->GetRowId());
         }
-        else {if(strcmp(pointer->val_, row->GetField(idx)->GetData()) != 0)res.push_back(Iterator->GetRowId());}
+        else if(type == kTypeInt){
+          Field field(type, atoi(pointer->val_));
+          if(row->GetField(idx)->CompareNotEquals(field))res.push_back(Iterator->GetRowId());
+        }
+        else if(type == kTypeChar){
+          Field field(type, pointer->val_, ((std::string)pointer->val_).size(), false);
+          if(row->GetField(idx)->CompareNotEquals(field))res.push_back(Iterator->GetRowId());
+        }
         ++Iterator;
         delete row;
       }
@@ -914,9 +933,14 @@ std::vector<RowId> ExecuteEngine::Condition(pSyntaxNode ast, std::string table_n
         Row* row = new Row(*Iterator);
         table_info->GetTableHeap()->GetTuple(row, NULL);
         if(type == kTypeFloat){
-          if(atof(row->GetField(idx)->GetData()) > atof(pointer->val_ ))res.push_back(Iterator->GetRowId());
+          Field field(type, (float)atof(pointer->val_));
+          if(row->GetField(idx)->CompareGreaterThan(field))res.push_back(Iterator->GetRowId());
         }
-        else {if(atoi(row->GetField(idx)->GetData()) > atoi(pointer->val_ ))res.push_back(Iterator->GetRowId());}
+        else if(type == kTypeInt){
+          Field field(type, atoi(pointer->val_));
+          if(row->GetField(idx)->CompareGreaterThan(field))res.push_back(Iterator->GetRowId());
+        }
+        if(row->GetField(idx))
         ++Iterator;
         delete row;
       }
@@ -936,9 +960,13 @@ std::vector<RowId> ExecuteEngine::Condition(pSyntaxNode ast, std::string table_n
         Row* row = new Row(*Iterator);
         table_info->GetTableHeap()->GetTuple(row, NULL);
         if(type == kTypeFloat){
-          if(atof(row->GetField(idx)->GetData()) < atof(pointer->val_ ))res.push_back(Iterator->GetRowId());
+          Field field(type, (float)atof(pointer->val_));
+          if(row->GetField(idx)->CompareLessThan(field))res.push_back(Iterator->GetRowId());
         }
-        else {if(atoi(row->GetField(idx)->GetData()) < atoi(pointer->val_ ))res.push_back(Iterator->GetRowId());}
+        else if(type == kTypeInt){
+          Field field(type, atoi(pointer->val_));
+          if(row->GetField(idx)->CompareLessThan(field))res.push_back(Iterator->GetRowId());
+        }
         ++Iterator;
         delete row;
       }
@@ -958,9 +986,13 @@ std::vector<RowId> ExecuteEngine::Condition(pSyntaxNode ast, std::string table_n
         Row* row = new Row(*Iterator);
         table_info->GetTableHeap()->GetTuple(row, NULL);
         if(type == kTypeFloat){
-          if(atof(row->GetField(idx)->GetData()) >= atof(pointer->val_ ))res.push_back(Iterator->GetRowId());
+          Field field(type, (float)atof(pointer->val_));
+          if(row->GetField(idx)->CompareGreaterThanEquals(field))res.push_back(Iterator->GetRowId());
         }
-        else {if(atoi(row->GetField(idx)->GetData()) >= atoi(pointer->val_ ))res.push_back(Iterator->GetRowId());}
+        else if(type == kTypeInt){
+          Field field(type, atoi(pointer->val_));
+          if(row->GetField(idx)->CompareGreaterThanEquals(field))res.push_back(Iterator->GetRowId());
+        }
         ++Iterator;
         delete row;
       }
@@ -980,9 +1012,13 @@ std::vector<RowId> ExecuteEngine::Condition(pSyntaxNode ast, std::string table_n
         Row* row = new Row(*Iterator);
         table_info->GetTableHeap()->GetTuple(row, NULL);
         if(type == kTypeFloat){
-          if(atof(row->GetField(idx)->GetData()) <= atof(pointer->val_ ))res.push_back(Iterator->GetRowId());
+          Field field(type, (float)atof(pointer->val_));
+          if(row->GetField(idx)->CompareLessThanEquals(field))res.push_back(Iterator->GetRowId());
         }
-        else {if(atoi(row->GetField(idx)->GetData()) <= atoi(pointer->val_ ))res.push_back(Iterator->GetRowId());}
+        else if(type == kTypeInt){
+          Field field(type, atoi(pointer->val_));
+          if(row->GetField(idx)->CompareLessThanEquals(field))res.push_back(Iterator->GetRowId());
+        }
         ++Iterator;
         delete row;
       }
