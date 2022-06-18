@@ -242,13 +242,21 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
         new_column = new Column(coloum_name, typeid_, length, columnindex, Nullable, unique);
     }
     columns.push_back(new_column);
-    
+
     NodePointer = NodePointer->next_; 
     columnindex++;
   }
   //LOG(INFO) << "ExecuteCreateTable check4" << std::endl;
   Schema* table_schema = new Schema(columns);
   db->catalog_mgr_->CreateTable(table_name, table_schema, NULL, tableinfo);
+  for(auto i = columns.begin(); i != columns.end(); i++){
+    if((*i)->IsUnique()){
+      std::vector<std::string> unique_key;
+      IndexInfo* index_info;
+      unique_key.push_back((*i)->GetName());
+      db->catalog_mgr_->CreateIndex(table_name, "Unique_"+(*i)->GetName(), unique_key, NULL, index_info);
+    }
+  }
   IndexInfo* index_info = NULL;
   db->catalog_mgr_->CreateIndex(table_name, "PRIMARY", primary_key, NULL, index_info);
   std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
@@ -402,7 +410,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
   TableInfo* table_info = NULL;
   std::string table_name;
   if(NodePointer->type_ == kNodeAllColumns){
-    LOG(INFO) << "ExecuteSelect check0.1" << std::endl;
+    //LOG(INFO) << "ExecuteSelect check0.1" << std::endl;
     NodePointer = NodePointer->next_;
     table_name = (std::string)NodePointer->val_;
     db->catalog_mgr_->GetTable(table_name, table_info);
@@ -412,7 +420,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     }
   }
   else{
-    LOG(INFO) << "ExecuteSelect check0.2" << std::endl;
+    //LOG(INFO) << "ExecuteSelect check0.2" << std::endl;
     pSyntaxNode childs = NodePointer->child_;
     while(childs!=NULL){
       columnList.push_back((std::string)childs->val_);
@@ -422,7 +430,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     table_name = (std::string)NodePointer->val_;
     db->catalog_mgr_->GetTable(table_name, table_info);
   }
-  LOG(INFO) << "ExecuteSelect check0" << std::endl;
+  //LOG(INFO) << "ExecuteSelect check0" << std::endl;
   std::vector<RowId> res;
   NodePointer = NodePointer->next_;
   if(NodePointer != NULL){
@@ -433,9 +441,9 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     TableIterator End = table_info->GetTableHeap()->End();
     while(Iterator != End){
       res.push_back(Iterator->GetRowId());
-      LOG(INFO) << "ExecuteSelect check PageId = " << Iterator->GetRowId().GetPageId() << std::endl;
+      //LOG(INFO) << "ExecuteSelect check PageId = " << Iterator->GetRowId().GetPageId() << std::endl;
       ++Iterator;
-      LOG(INFO) << "ExecuteSelect check0.3 "<< std::endl;
+      //LOG(INFO) << "ExecuteSelect check0.3 "<< std::endl;
       }
     
   }
@@ -467,25 +475,30 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
   std::string table_name = (std::string)NodePointer->val_;
   TableInfo *table_info = NULL;
   db->catalog_mgr_->GetTable(table_name,table_info);
-  LOG(INFO) << "ExecuteInsert check1" << std::endl;
+  //LOG(INFO) << "ExecuteInsert check1" << std::endl;
   std::vector<Column*> columns = table_info->GetSchema()->GetColumns();
-  LOG(INFO) << "ExecuteInsert check0" << std::endl;
+  //LOG(INFO) << "ExecuteInsert check0" << std::endl;
   NodePointer = NodePointer->next_;
   NodePointer = NodePointer->child_;
-  LOG(INFO) << "ExecuteInsert check2" << std::endl;
+  //LOG(INFO) << "ExecuteInsert check2" << std::endl;
   std::vector<Field> fields;
   int cnt = 0;
   while(NodePointer != NULL){
 
     if(columns[cnt]->IsUnique()){
-      for(auto i = table_info->GetTableHeap()->Begin(NULL); i != table_info->GetTableHeap()->End(); i++){
-        Row* row = new Row(*i);
-        table_info->GetTableHeap()->GetTuple(row, NULL);
-        if(row->GetField(cnt)->IsNull())continue;
-        else if(strcmp(row->GetField(cnt)->GetData(), NodePointer->val_) == 0){
-          cout<<"Error: Unique Constraints Conflict!"<<endl;
-          return DB_FAILED;
-        }
+      IndexInfo* index_info;
+      db->catalog_mgr_->GetIndex(table_name, "Unique_"+columns[cnt]->GetName(), index_info);
+      std::vector<Field> fields;
+      if(columns[cnt]->GetType() == kTypeChar)fields.push_back(Field(columns[cnt]->GetType(), NodePointer->val_, std::string(NodePointer->val_).size(), false));
+      else if(columns[cnt]->GetType() == kTypeInt)fields.push_back(Field(columns[cnt]->GetType(), atoi(NodePointer->val_)));
+      else if(columns[cnt]->GetType() == kTypeFloat)fields.push_back(Field(columns[cnt]->GetType(), (float)atof((const char*)NodePointer->val_)));
+      Row key(fields);
+      std::vector<RowId> result;
+      result.clear();
+      index_info->GetIndex()->ScanKey(key, result, NULL);
+      if(!result.empty()){
+        cout<<"Error: Unique Constraints Conflict!"<<endl;
+        return DB_FAILED;
       }
     }
 
@@ -495,7 +508,8 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
       else return DB_FAILED;
     }
     else if(NodePointer->type_ == kNodeString){
-      if(columns[cnt]->GetType() == kTypeChar)fields.push_back(Field((kTypeChar), (char*)NodePointer->val_, ((std::string)NodePointer->val_).size(), true));
+      if(columns[cnt]->GetType() == kTypeChar)fields.push_back(Field((kTypeChar), (char*)NodePointer->val_, std::string(NodePointer->val_).size(), true));
+      //std::cout << "KTypeChar:" << (char*)NodePointer->val_ << " length: "  << std::string(NodePointer->val_).size() << std::endl;
       else return DB_FAILED;
     }
     else if(NodePointer->type_ == kNodeNull){
@@ -507,12 +521,12 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
     cnt++;
     NodePointer = NodePointer->next_;
   }
-  LOG(INFO) << "ExecuteInsert check3" << std::endl;
+ // LOG(INFO) << "ExecuteInsert check3" << std::endl;
   Row row(fields);
-  LOG(INFO) << "ExecuteInsert check4" << std::endl;
+  //LOG(INFO) << "ExecuteInsert check4" << std::endl;
   table_info->GetTableHeap()->InsertTuple(row,NULL);
   RowId rid(row.GetRowId());
-  LOG(INFO) << "ExecuteInsert check5" << std::endl;
+  //LOG(INFO) << "ExecuteInsert check5" << std::endl;
   
   vector<IndexInfo*> index_infos;
   db->catalog_mgr_->GetTableIndexes(table_name, index_infos);
@@ -521,7 +535,7 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
     vector<uint32_t> column_indexes;
     for(auto j = key_columns.begin(); j != key_columns.end();j++){
       uint32_t idx;
-      (*i)->GetIndexKeySchema()->GetColumnIndex((*j)->GetName(), idx);
+      table_info->GetSchema()->GetColumnIndex((*j)->GetName(), idx);
       column_indexes.push_back(idx);
     }
     vector<Field> index_fields;
@@ -573,7 +587,7 @@ dberr_t ExecuteEngine::ExecuteDelete(pSyntaxNode ast, ExecuteContext *context) {
     vector<uint32_t> column_indexes;
     for(auto j = key_columns.begin(); j != key_columns.end();j++){
       uint32_t idx;
-      (*i)->GetIndexKeySchema()->GetColumnIndex((*j)->GetName(), idx);
+      table_info->GetSchema()->GetColumnIndex((*j)->GetName(), idx);
       column_indexes.push_back(idx);
     }
     for(auto m = rows.begin(); m!= rows.end(); m++){

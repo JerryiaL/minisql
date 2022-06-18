@@ -124,21 +124,23 @@ dberr_t CatalogManager::CreateTable(const string &table_name, TableSchema *schem
     uint32_t this_table_id = next_table_id_.load();
     table_names_[table_name] = this_table_id;
 
-    page_id_t this_table_page;
-    Page *p = buffer_pool_manager_->NewPage(this_table_page);
-
-    TableMetadata *tm;
-    tm = tm->Create(this_table_id, table_name, this_table_page, schema, heap_);
-
     TableHeap *tp;
-    tp = tp->Create(buffer_pool_manager_, this_table_page, schema, log_manager_, lock_manager_, heap_);
+    tp = tp->Create(buffer_pool_manager_, schema, txn, log_manager_, lock_manager_, heap_);
+    
+    page_id_t this_table_heap_page = tp->GetFirstPageId();
+    LOG(INFO) << "this_table_page:" << this_table_heap_page;
+    TableMetadata *tm;
+    tm = tm->Create(this_table_id, table_name, this_table_heap_page, schema, heap_);
     table_info = table_info->Create(heap_);
     table_info->Init(tm, tp);
     tables_[this_table_id] = table_info;
     next_table_id_++;
-    catalog_meta_->table_meta_pages_[this_table_id]  = this_table_page;
+    
     index_names_[table_name] = {};
 
+    page_id_t this_table_page;
+    Page *p = buffer_pool_manager_->NewPage(this_table_page);
+    catalog_meta_->table_meta_pages_[this_table_id]  = this_table_page;
     tm->SerializeTo(p->GetData());
     buffer_pool_manager_->UnpinPage(this_table_page, true);
   }
@@ -336,7 +338,7 @@ dberr_t CatalogManager::LoadTable(const table_id_t table_id, const page_id_t pag
 
 
   TableHeap *th;
-  th = th->Create(buffer_pool_manager_, page_id, tm->GetSchema(), log_manager_, lock_manager_, heap_);
+  th = th->Create(buffer_pool_manager_, tm->GetFirstPageId(), tm->GetSchema(), log_manager_, lock_manager_, heap_);
 
   TableInfo *ti;
   ti = ti->Create(heap_);

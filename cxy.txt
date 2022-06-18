@@ -1,0 +1,4 @@
+create database db0;
+create table t1(a int, b char(20) unique, c float, primary key(a, c));
+insert into t1 values(1, "aaa", 2.33);
+select * from t1;
