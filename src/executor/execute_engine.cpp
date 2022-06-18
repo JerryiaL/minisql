@@ -6,14 +6,41 @@
 #include <fstream>
 #include <time.h>
 #include <chrono>
+#include <dirent.h>
+#include <sys/stat.h> 　
+#include <sys/types.h> 
+
+void getAllDatabase(string path, vector<string>& files) 
+{
+  DIR *dp; //创建一个指向root路径下每个文件的指针
+  struct dirent *dirp;
+  if((dp = opendir(path.c_str()))==NULL)
+  {
+    mkdir(path.c_str(),S_IRUSR | S_IWUSR | S_IXUSR | S_IRWXG | S_IRWXO);
+    return;
+  }
+  int i = 0;
+  while((dirp = readdir(dp)) != NULL){
+    i++;
+    if(i > 2) files.push_back(dirp->d_name);
+  }
+}
+
 extern "C" {
 int yyparse(void);
 #include "parser/minisql_lex.h"
 #include "parser/parser.h"
 
 }
-ExecuteEngine::ExecuteEngine() {
-
+ExecuteEngine::ExecuteEngine() 
+{
+  vector<string> dbname;
+  getAllDatabase("./database/", dbname);
+  for(int i = 0; i < dbname.size(); i++)
+  {
+    DBStorageEngine * newdb = new DBStorageEngine("./database/"+dbname[i], false);
+    dbs_.insert({dbname[i], newdb});
+  }
 }
 
 
@@ -84,10 +111,10 @@ dberr_t ExecuteEngine::ExecuteCreateDatabase(pSyntaxNode ast, ExecuteContext *co
   NodePointer = NodePointer->child_;
   string db_name = (string)NodePointer->val_;
   if(dbs_.find(db_name) != dbs_.end()) {
-    cout<<"This Database Name is already used."<<endl;
+    cout<<"This Database has already existed."<<endl;
     return DB_FAILED;
   }
-  DBStorageEngine * newdb = new DBStorageEngine(db_name);
+  DBStorageEngine * newdb = new DBStorageEngine("./database/"+db_name);
   dbs_.insert({db_name, newdb});
   current_db_ = db_name;
   std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
@@ -109,6 +136,7 @@ dberr_t ExecuteEngine::ExecuteDropDatabase(pSyntaxNode ast, ExecuteContext *cont
   DBStorageEngine *deletedDB = it->second;
   delete deletedDB;
   dbs_.erase(db_name);
+  remove(("./database/"+db_name).c_str());
   if(db_name == current_db_)current_db_ = "";
   std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
   std::chrono::microseconds timeInterval = std::chrono::duration_cast <std::chrono::microseconds>(endTime - beginTime);
@@ -417,6 +445,11 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     NodePointer = NodePointer->next_;
     table_name = (std::string)NodePointer->val_;
     db->catalog_mgr_->GetTable(table_name, table_info);
+    if(table_info == NULL)
+    {
+      cout<<"Error: No such table"<<endl;
+      return DB_TABLE_NOT_EXIST;
+    }
     uint32_t cnt = table_info->GetSchema()->GetColumnCount();
     for(uint32_t i = 0; i < cnt; i++){
       columnList.push_back(table_info->GetSchema()->GetColumn(i)->GetName());
@@ -478,6 +511,11 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
   std::string table_name = (std::string)NodePointer->val_;
   TableInfo *table_info = NULL;
   db->catalog_mgr_->GetTable(table_name,table_info);
+  if(table_info == NULL)
+  {
+    cout<<"Error: No such table"<<endl;
+    return DB_TABLE_NOT_EXIST;
+  }
   //LOG(INFO) << "ExecuteInsert check1" << std::endl;
   std::vector<Column*> columns = table_info->GetSchema()->GetColumns();
   //LOG(INFO) << "ExecuteInsert check0" << std::endl;
@@ -565,6 +603,11 @@ dberr_t ExecuteEngine::ExecuteDelete(pSyntaxNode ast, ExecuteContext *context) {
   std::string table_name = (std::string)NodePointer->val_;
   TableInfo *table_info = NULL;
   db->catalog_mgr_->GetTable(table_name,table_info);
+  if(table_info == NULL)
+  {
+    cout<<"Error: No such table"<<endl;
+    return DB_TABLE_NOT_EXIST;
+  }
   NodePointer = NodePointer->next_;
   std::vector<RowId> res;
   if(NodePointer!=NULL)res = Condition(NodePointer->child_, table_name);
@@ -899,24 +942,27 @@ std::vector<RowId> ExecuteEngine::Condition(pSyntaxNode ast, std::string table_n
       TableIterator Iterator = table_info->GetTableHeap()->Begin(NULL);
       TableIterator End = table_info->GetTableHeap()->End();
       TypeId type = table_info->GetSchema()->GetColumn(idx)->GetType();
+      Field *f;
+      if(type == kTypeInt)
+      {
+        f = new Field(kTypeInt, atoi(pointer->val_));
+      }
+      else if(type == kTypeFloat)
+      {
+        f = new Field(kTypeFloat, float(atof(pointer->val_)));
+      }
+      else
+      {
+        f = new Field(kTypeChar, pointer->val_, string(pointer->val_).size(), false); 
+      }
       while(Iterator != End){
         Row* row = new Row(*Iterator);
         table_info->GetTableHeap()->GetTuple(row, NULL);
-        if(type == kTypeFloat){
-          Field field(type, (float)atof(pointer->val_));
-          if(row->GetField(idx)->CompareNotEquals(field))res.push_back(Iterator->GetRowId());
-        }
-        else if(type == kTypeInt){
-          Field field(type, atoi(pointer->val_));
-          if(row->GetField(idx)->CompareNotEquals(field))res.push_back(Iterator->GetRowId());
-        }
-        else if(type == kTypeChar){
-          Field field(type, pointer->val_, ((std::string)pointer->val_).size(), false);
-          if(row->GetField(idx)->CompareNotEquals(field))res.push_back(Iterator->GetRowId());
-        }
+        if(row->GetField(idx)->CompareNotEquals(*f) == kTrue)res.push_back(Iterator->GetRowId());
         ++Iterator;
         delete row;
       }
+      delete f;
     }
     else if((std::string)ast->val_ == ">"){
       pointer = pointer->child_;
@@ -929,21 +975,27 @@ std::vector<RowId> ExecuteEngine::Condition(pSyntaxNode ast, std::string table_n
       TableIterator Iterator = table_info->GetTableHeap()->Begin(NULL);
       TableIterator End = table_info->GetTableHeap()->End();
       TypeId type = table_info->GetSchema()->GetColumn(idx)->GetType();
+      Field *f;
+      if(type == kTypeInt)
+      {
+        f = new Field(kTypeInt, atoi(pointer->val_));
+      }
+      else if(type == kTypeFloat)
+      {
+        f = new Field(kTypeFloat, float(atof(pointer->val_)));
+      }
+      else
+      {
+        f = new Field(kTypeChar, pointer->val_, string(pointer->val_).size(), false); 
+      }
       while(Iterator != End){
         Row* row = new Row(*Iterator);
         table_info->GetTableHeap()->GetTuple(row, NULL);
-        if(type == kTypeFloat){
-          Field field(type, (float)atof(pointer->val_));
-          if(row->GetField(idx)->CompareGreaterThan(field))res.push_back(Iterator->GetRowId());
-        }
-        else if(type == kTypeInt){
-          Field field(type, atoi(pointer->val_));
-          if(row->GetField(idx)->CompareGreaterThan(field))res.push_back(Iterator->GetRowId());
-        }
-        if(row->GetField(idx))
+        if(row->GetField(idx)->CompareGreaterThan(*f) == kTrue)res.push_back(Iterator->GetRowId());
         ++Iterator;
         delete row;
       }
+      delete f;
     }
     else if((std::string)ast->val_ == "<"){
       pointer = pointer->child_;
@@ -956,20 +1008,27 @@ std::vector<RowId> ExecuteEngine::Condition(pSyntaxNode ast, std::string table_n
       TableIterator Iterator = table_info->GetTableHeap()->Begin(NULL);
       TableIterator End = table_info->GetTableHeap()->End();
       TypeId type = table_info->GetSchema()->GetColumn(idx)->GetType();
+      Field *f;
+      if(type == kTypeInt)
+      {
+        f = new Field(kTypeInt, atoi(pointer->val_));
+      }
+      else if(type == kTypeFloat)
+      {
+        f = new Field(kTypeFloat, float(atof(pointer->val_)));
+      }
+      else
+      {
+        f = new Field(kTypeChar, pointer->val_, string(pointer->val_).size(), false); 
+      }
       while(Iterator != End){
         Row* row = new Row(*Iterator);
         table_info->GetTableHeap()->GetTuple(row, NULL);
-        if(type == kTypeFloat){
-          Field field(type, (float)atof(pointer->val_));
-          if(row->GetField(idx)->CompareLessThan(field))res.push_back(Iterator->GetRowId());
-        }
-        else if(type == kTypeInt){
-          Field field(type, atoi(pointer->val_));
-          if(row->GetField(idx)->CompareLessThan(field))res.push_back(Iterator->GetRowId());
-        }
+        if(row->GetField(idx)->CompareLessThan(*f) == kTrue)res.push_back(Iterator->GetRowId());
         ++Iterator;
         delete row;
       }
+      delete f;
     }
     else if((std::string)ast->val_ == ">="){
       pointer = pointer->child_;
@@ -982,20 +1041,27 @@ std::vector<RowId> ExecuteEngine::Condition(pSyntaxNode ast, std::string table_n
       TableIterator Iterator = table_info->GetTableHeap()->Begin(NULL);
       TableIterator End = table_info->GetTableHeap()->End();
       TypeId type = table_info->GetSchema()->GetColumn(idx)->GetType();
+      Field *f;
+      if(type == kTypeInt)
+      {
+        f = new Field(kTypeInt, atoi(pointer->val_));
+      }
+      else if(type == kTypeFloat)
+      {
+        f = new Field(kTypeFloat, float(atof(pointer->val_)));
+      }
+      else
+      {
+        f = new Field(kTypeChar, pointer->val_, string(pointer->val_).size(), false); 
+      }
       while(Iterator != End){
         Row* row = new Row(*Iterator);
         table_info->GetTableHeap()->GetTuple(row, NULL);
-        if(type == kTypeFloat){
-          Field field(type, (float)atof(pointer->val_));
-          if(row->GetField(idx)->CompareGreaterThanEquals(field))res.push_back(Iterator->GetRowId());
-        }
-        else if(type == kTypeInt){
-          Field field(type, atoi(pointer->val_));
-          if(row->GetField(idx)->CompareGreaterThanEquals(field))res.push_back(Iterator->GetRowId());
-        }
+        if(row->GetField(idx)->CompareGreaterThanEquals(*f) == kTrue)res.push_back(Iterator->GetRowId());
         ++Iterator;
         delete row;
       }
+      delete f;
     }
     else if((std::string)ast->val_ == "<="){
       pointer = pointer->child_;
@@ -1008,20 +1074,27 @@ std::vector<RowId> ExecuteEngine::Condition(pSyntaxNode ast, std::string table_n
       TableIterator Iterator = table_info->GetTableHeap()->Begin(NULL);
       TableIterator End = table_info->GetTableHeap()->End();
       TypeId type = table_info->GetSchema()->GetColumn(idx)->GetType();
+      Field *f;
+      if(type == kTypeInt)
+      {
+        f = new Field(kTypeInt, atoi(pointer->val_));
+      }
+      else if(type == kTypeFloat)
+      {
+        f = new Field(kTypeFloat, float(atof(pointer->val_)));
+      }
+      else
+      {
+        f = new Field(kTypeChar, pointer->val_, string(pointer->val_).size(), false); 
+      }
       while(Iterator != End){
         Row* row = new Row(*Iterator);
         table_info->GetTableHeap()->GetTuple(row, NULL);
-        if(type == kTypeFloat){
-          Field field(type, (float)atof(pointer->val_));
-          if(row->GetField(idx)->CompareLessThanEquals(field))res.push_back(Iterator->GetRowId());
-        }
-        else if(type == kTypeInt){
-          Field field(type, atoi(pointer->val_));
-          if(row->GetField(idx)->CompareLessThanEquals(field))res.push_back(Iterator->GetRowId());
-        }
+        if(row->GetField(idx)->CompareLessThanEquals(*f) == kTrue)res.push_back(Iterator->GetRowId());
         ++Iterator;
         delete row;
       }
+      delete f;
     }
   }
   return res;
