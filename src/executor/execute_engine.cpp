@@ -1,10 +1,13 @@
 #include "executor/execute_engine.h"
 #include "glog/logging.h"
+#include "parser/syntax_tree_printer.h"
+#include "utils/tree_file_mgr.h"
 #include <algorithm>
 #include <fstream>
+#include <time.h>
+#include <chrono>
 extern "C" {
 int yyparse(void);
-
 #include "parser/minisql_lex.h"
 #include "parser/parser.h"
 
@@ -70,19 +73,28 @@ dberr_t ExecuteEngine::Execute(pSyntaxNode ast, ExecuteContext *context) {
 }
 
 dberr_t ExecuteEngine::ExecuteCreateDatabase(pSyntaxNode ast, ExecuteContext *context) {
+  std::chrono::high_resolution_clock::time_point beginTime = std::chrono::high_resolution_clock::now();
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteCreateDatabase" << std::endl;
 #endif
   pSyntaxNode NodePointer = ast;
   NodePointer = NodePointer->child_;
   string db_name = (string)NodePointer->val_;
+  if(dbs_.find(db_name) != dbs_.end()) {
+    cout<<"This Database Name is already used."<<endl;
+    return DB_FAILED;
+  }
   DBStorageEngine * newdb = new DBStorageEngine(db_name);
   dbs_.insert({db_name, newdb});
   current_db_ = db_name;
+  std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+  std::chrono::microseconds timeInterval = std::chrono::duration_cast <std::chrono::microseconds>(endTime - beginTime);
+  std::cout << "Time: " << timeInterval.count() << "us" << endl;
   return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteDropDatabase(pSyntaxNode ast, ExecuteContext *context) {
+  std::chrono::high_resolution_clock::time_point beginTime = std::chrono::high_resolution_clock::now();
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteDropDatabase" << std::endl;
 #endif
@@ -95,33 +107,53 @@ dberr_t ExecuteEngine::ExecuteDropDatabase(pSyntaxNode ast, ExecuteContext *cont
   delete deletedDB;
   dbs_.erase(db_name);
   if(db_name == current_db_)current_db_ = "";
+  std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+  std::chrono::microseconds timeInterval = std::chrono::duration_cast <std::chrono::microseconds>(endTime - beginTime);
+  std::cout << "Time: " << timeInterval.count() << "us" << endl;
   return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteShowDatabases(pSyntaxNode ast, ExecuteContext *context) {
+  std::chrono::high_resolution_clock::time_point beginTime = std::chrono::high_resolution_clock::now();
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteShowDatabases" << std::endl;
 #endif
+  if(dbs_.size() == 0){
+    cout<<"No Database yet."<<endl;
+    return DB_SUCCESS;
+  }
   std::unordered_map<std::string, DBStorageEngine *>::iterator it = dbs_.begin();
   while(it!=dbs_.end()){
     cout << it->first << endl;
     it++;
   }
+  std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+  std::chrono::microseconds timeInterval = std::chrono::duration_cast <std::chrono::microseconds>(endTime - beginTime);
+  std::cout << "Time: " << timeInterval.count() << "us" << endl;
   return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteUseDatabase(pSyntaxNode ast, ExecuteContext *context) {
+  std::chrono::high_resolution_clock::time_point beginTime = std::chrono::high_resolution_clock::now();
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteUseDatabase" << std::endl;
 #endif
   pSyntaxNode NodePointer = ast;
   NodePointer = NodePointer->child_;
-  string db_name = NodePointer->val_;
+  std::string db_name = (std::string)NodePointer->val_;
+  if(dbs_.find(db_name) == dbs_.end()){
+    cout<<"No such Database."<<endl;
+    return DB_FAILED;
+  }
   current_db_ = db_name;
+  std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+  std::chrono::microseconds timeInterval = std::chrono::duration_cast <std::chrono::microseconds>(endTime - beginTime);
+  std::cout << "Time: " << timeInterval.count() << "us" << endl;
   return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteShowTables(pSyntaxNode ast, ExecuteContext *context) {
+  std::chrono::high_resolution_clock::time_point beginTime = std::chrono::high_resolution_clock::now();
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteShowTables" << std::endl;
 #endif
@@ -131,10 +163,14 @@ dberr_t ExecuteEngine::ExecuteShowTables(pSyntaxNode ast, ExecuteContext *contex
   for(int i = 0; i < (int)tables.size() ; i++){
     cout << tables[i]->GetTableName() << endl;
   }
+  std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+  std::chrono::microseconds timeInterval = std::chrono::duration_cast <std::chrono::microseconds>(endTime - beginTime);
+  std::cout << "Time: " << timeInterval.count() << "us" << endl;
   return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *context) {
+  std::chrono::high_resolution_clock::time_point beginTime = std::chrono::high_resolution_clock::now();
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteCreateTable" << std::endl;
 #endif
@@ -157,6 +193,10 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
   pSyntaxNode primaryPointer = NodePointer;
   while(primaryPointer->next_ != NULL)primaryPointer=primaryPointer->next_;
   primaryPointer=primaryPointer->child_;
+  if(primaryPointer == NULL){
+    cout<<"Error: there are no primary key."<<endl;
+    return DB_FAILED;
+  }
   while(primaryPointer != NULL){
     primary_key.push_back((std::string)primaryPointer->val_);
     primaryPointer = primaryPointer->next_;
@@ -169,9 +209,12 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
     if(NodePointer->val_ != NULL && (string)NodePointer->val_ == "unique")unique = true;
     pSyntaxNode pChild = NodePointer->child_;
     std::string coloum_name = (std::string)pChild->val_;
-    if(std::count(primary_key.begin(), primary_key.end(), coloum_name))Nullable = false;
+    if(std::count(primary_key.begin(), primary_key.end(), coloum_name)){
+      Nullable = false;
+      unique = true;
+    }
     pChild = pChild->next_;
-    LOG(INFO) << "ExecuteCreateTable check1" << std::endl;
+   // LOG(INFO) << "ExecuteCreateTable check1" << std::endl;
     std::string type_name = (std::string)pChild->val_;
     TypeId typeid_;
     if(type_name == "int")typeid_ = kTypeInt;
@@ -186,13 +229,13 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
           length = atoi(pChild->val_);
         }
         else{
-          LOG(INFO) << "ExecuteCreateTable ILLEGAL!" << std::endl;
+          cout << "Char type need length!" << endl;
           return DB_FAILED;
           }
       }
     }
     
-    LOG(INFO) << "ExecuteCreateTable check3 type: "<< typeid_ << std::endl;
+    //LOG(INFO) << "ExecuteCreateTable check3 type: "<< typeid_ << std::endl;
     Column* new_column;
     if(typeid_ != kTypeChar) new_column = new Column(coloum_name, typeid_, columnindex, Nullable, unique);
     else{
@@ -203,45 +246,63 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
     NodePointer = NodePointer->next_; 
     columnindex++;
   }
-  LOG(INFO) << "ExecuteCreateTable check4" << std::endl;
+  //LOG(INFO) << "ExecuteCreateTable check4" << std::endl;
   Schema* table_schema = new Schema(columns);
   db->catalog_mgr_->CreateTable(table_name, table_schema, NULL, tableinfo);
   IndexInfo* index_info = NULL;
   db->catalog_mgr_->CreateIndex(table_name, "PRIMARY", primary_key, NULL, index_info);
+  std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+  std::chrono::microseconds timeInterval = std::chrono::duration_cast <std::chrono::microseconds>(endTime - beginTime);
+  std::cout << "Time: " << timeInterval.count() << "us" << endl;
   return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteDropTable(pSyntaxNode ast, ExecuteContext *context) {
+  std::chrono::high_resolution_clock::time_point beginTime = std::chrono::high_resolution_clock::now();
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteDropTable" << std::endl;
 #endif
   pSyntaxNode NodePointer = ast;
   NodePointer = NodePointer->child_;
-  string table_name = NodePointer->val_;
+  std::string table_name = NodePointer->val_;
   DBStorageEngine* db = dbs_.find(current_db_)->second;
+  TableInfo* table_info = NULL;
+  db->catalog_mgr_->GetTable(table_name, table_info);
+  if(table_info == NULL){
+    cout<<"Error: No Such Table."<<endl;
+    return DB_FAILED;
+  }
   db->catalog_mgr_->DropTable(table_name);
+  std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+  std::chrono::microseconds timeInterval = std::chrono::duration_cast <std::chrono::microseconds>(endTime - beginTime);
+  std::cout << "Time: " << timeInterval.count() << "us" << endl;
   return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteShowIndexes(pSyntaxNode ast, ExecuteContext *context) {
+  std::chrono::high_resolution_clock::time_point beginTime = std::chrono::high_resolution_clock::now();
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteShowIndexes" << std::endl;
 #endif
   DBStorageEngine* db = dbs_.find(current_db_)->second;
   std::vector<TableInfo *> tables;
   db->catalog_mgr_->GetTables(tables);
-  for(int i = 0; i < (int)tables.size() ; i++){
+  for(auto i = tables.begin(); i != tables.end() ; i++){
     std::vector<IndexInfo *> indexes;
-    db->catalog_mgr_->GetTableIndexes(tables[i]->GetTableName(), indexes);
-    for(int j = 0; j < (int)indexes.size(); i++){
-      cout << "| " << tables[i]->GetTableName() << " | " << indexes[j]->GetIndexName() << " | " ;//should be more here
+    db->catalog_mgr_->GetTableIndexes((*i)->GetTableName(), indexes);
+    for(int j = 0; j < (int)indexes.size(); j++){
+      cout << "| " << (*i)->GetTableName() << " | " << indexes[j]->GetIndexName() << " | " ;//should be more here
       cout<<endl;
     }
   }
+  std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+  std::chrono::microseconds timeInterval = std::chrono::duration_cast <std::chrono::microseconds>(endTime - beginTime);
+  std::cout << "Time: " << timeInterval.count() << "us" << endl;
   return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext *context) {
+   std::chrono::high_resolution_clock::time_point beginTime = std::chrono::high_resolution_clock::now();
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteCreateIndex" << std::endl;
 #endif
@@ -254,21 +315,56 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext *conte
 
   NodePointer = NodePointer->next_;
   std::string table_name = (std::string)NodePointer->val_;
+  TableInfo* table_info;
+  db->catalog_mgr_->GetTable(table_name, table_info);
+
+  IndexInfo *index_info = NULL;
+  db->catalog_mgr_->GetIndex(table_name, index_name, index_info);
+  if(index_info != NULL){
+    cout<<"Error: Index already exists."<<endl;
+    return DB_FAILED;
+  }
 
   NodePointer = NodePointer->next_;
   std::vector<std::string> keys;
   pSyntaxNode childpointer = NodePointer->child_;
   while(childpointer != NULL){
+    //only unique key can create index
+    uint32_t idx;
+    table_info->GetSchema()->GetColumnIndex((std::string)childpointer->val_,idx);
+    if(!table_info->GetSchema()->GetColumn(idx)->IsUnique()){
+      cout<<"Error: Index can only be create on unique keys."<<endl;
+      return DB_FAILED;
+    }
     keys.push_back((std::string)childpointer->val_);
     childpointer = childpointer->next_;
   }
-  IndexInfo* index_info = NULL;
-  db->catalog_mgr_->CreateIndex(table_name, index_name, keys, NULL, index_info);
-
+  IndexInfo* New_index_info = NULL;
+  db->catalog_mgr_->CreateIndex(table_name, index_name, keys, NULL, New_index_info);
+  vector<uint32_t>index_column_num;
+  for(auto i = keys.begin(); i != keys.end(); i++){
+    uint32_t idx;
+    table_info->GetSchema()->GetColumnIndex(*i, idx);
+    index_column_num.push_back(idx);
+  }
+  for(auto i = table_info->GetTableHeap()->Begin(NULL); i != table_info->GetTableHeap()->End(); i++){
+    vector<Field> index_fields;
+    Row *temp_row = new Row(i->GetRowId());
+    table_info->GetTableHeap()->GetTuple(temp_row, NULL);
+    for(auto j=index_column_num.begin(); j != index_column_num.end(); j++){
+      index_fields.push_back(*(temp_row->GetField(*j)));
+    }
+    Row index_row(index_fields);
+    New_index_info->GetIndex()->InsertEntry(index_row, i->GetRowId(), NULL);
+  }
+  std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+  std::chrono::microseconds timeInterval = std::chrono::duration_cast <std::chrono::microseconds>(endTime - beginTime);
+  std::cout << "Time: " << timeInterval.count() << "us" << endl;
   return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteDropIndex(pSyntaxNode ast, ExecuteContext *context) {
+   std::chrono::high_resolution_clock::time_point beginTime = std::chrono::high_resolution_clock::now();
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteDropIndex" << std::endl;
 #endif
@@ -284,12 +380,19 @@ dberr_t ExecuteEngine::ExecuteDropIndex(pSyntaxNode ast, ExecuteContext *context
     db->catalog_mgr_->GetIndex(tables[i]->GetTableName(), index_name, info);
     if(info != NULL)break;
   }
-  if(info == NULL)return DB_INDEX_NOT_FOUND;
+  if(info == NULL){
+    cout<<"Error: Index Not Found!"<<endl;
+    return DB_INDEX_NOT_FOUND;
+    }
   db->catalog_mgr_->DropIndex(tables[i]->GetTableName(), index_name);
+  std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+  std::chrono::microseconds timeInterval = std::chrono::duration_cast <std::chrono::microseconds>(endTime - beginTime);
+  std::cout << "Time: " << timeInterval.count() << "us" << endl;
   return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
+  std::chrono::high_resolution_clock::time_point beginTime = std::chrono::high_resolution_clock::now();
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteSelect" << std::endl;
 #endif
@@ -314,27 +417,48 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     while(childs!=NULL){
       columnList.push_back((std::string)childs->val_);
       childs = childs->next_;
-    }
+    }  
+    NodePointer = NodePointer->next_;
+    table_name = (std::string)NodePointer->val_;
+    db->catalog_mgr_->GetTable(table_name, table_info);
   }
   LOG(INFO) << "ExecuteSelect check0" << std::endl;
   std::vector<RowId> res;
   NodePointer = NodePointer->next_;
   if(NodePointer != NULL){
-    res = Condition(NodePointer, table_name);
+    res = Condition(NodePointer->child_, table_name);
   }
-  LOG(INFO) << "ExecuteSelect check1" << std::endl;
+  else{
+    TableIterator Iterator = table_info->GetTableHeap()->Begin(NULL);
+    TableIterator End = table_info->GetTableHeap()->End();
+    while(Iterator != End){
+      res.push_back(Iterator->GetRowId());
+      LOG(INFO) << "ExecuteSelect check PageId = " << Iterator->GetRowId().GetPageId() << std::endl;
+      ++Iterator;
+      LOG(INFO) << "ExecuteSelect check0.3 "<< std::endl;
+      }
+    
+  }
+  LOG(INFO) << "ExecuteSelect check1 res.size = "<< res.size() << std::endl;
   for(int i = 0; i < (int)res.size(); i++){
+    if(res[i].GetPageId() == -1)break;
     Row* row = new Row(res[i]);
     table_info->GetTableHeap()->GetTuple(row, NULL);
-    for(int j = 0; j < (int)row->GetFieldCount(); j++){
-      cout<<" "<<row->GetField(j)<<" ";
+    for(int j = 0; j < (int)columnList.size(); j++){
+      uint32_t idx;
+      table_info->GetSchema()->GetColumnIndex(columnList[j], idx);
+      cout<<" "<<row->GetField(idx)->GetData()<<" ";
     }
     cout<<endl;
   }
+  std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+  std::chrono::microseconds timeInterval = std::chrono::duration_cast <std::chrono::microseconds>(endTime - beginTime);
+  std::cout << "Time: " << timeInterval.count() << "us" << endl;
   return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
+  std::chrono::high_resolution_clock::time_point beginTime = std::chrono::high_resolution_clock::now();
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteInsert" << std::endl;
 #endif
@@ -352,6 +476,19 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
   std::vector<Field> fields;
   int cnt = 0;
   while(NodePointer != NULL){
+
+    if(columns[cnt]->IsUnique()){
+      for(auto i = table_info->GetTableHeap()->Begin(NULL); i != table_info->GetTableHeap()->End(); i++){
+        Row* row = new Row(*i);
+        table_info->GetTableHeap()->GetTuple(row, NULL);
+        if(row->GetField(cnt)->IsNull())continue;
+        else if(strcmp(row->GetField(cnt)->GetData(), NodePointer->val_) == 0){
+          cout<<"Error: Unique Constraints Conflict!"<<endl;
+          return DB_FAILED;
+        }
+      }
+    }
+
     if(NodePointer->type_ == kNodeNumber){
       if(columns[cnt]->GetType() == kTypeInt)fields.push_back(Field(kTypeInt, atoi(NodePointer->val_)));
       else if(columns[cnt]->GetType() == kTypeFloat)fields.push_back(Field(kTypeFloat, (float)atof((const char*)NodePointer->val_)));
@@ -362,6 +499,9 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
       else return DB_FAILED;
     }
     else if(NodePointer->type_ == kNodeNull){
+      if(!columns[cnt]->IsNullable()){
+        cout<<"Error: this column not Nullable."<<endl;
+      }
       fields.push_back(Field(columns[cnt]->GetType()));
     }
     cnt++;
@@ -372,15 +512,34 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
   LOG(INFO) << "ExecuteInsert check4" << std::endl;
   table_info->GetTableHeap()->InsertTuple(row,NULL);
   RowId rid(row.GetRowId());
-  IndexInfo* index_info = NULL;
   LOG(INFO) << "ExecuteInsert check5" << std::endl;
-  db->catalog_mgr_->GetIndex(table_name, "PRIMARY", index_info);
-  index_info->GetIndex()->InsertEntry(row, rid, NULL);
   
+  vector<IndexInfo*> index_infos;
+  db->catalog_mgr_->GetTableIndexes(table_name, index_infos);
+  for(auto i = index_infos.begin(); i != index_infos.end(); i++){
+    vector<Column*> key_columns = (*i)->GetIndexKeySchema()->GetColumns();
+    vector<uint32_t> column_indexes;
+    for(auto j = key_columns.begin(); j != key_columns.end();j++){
+      uint32_t idx;
+      (*i)->GetIndexKeySchema()->GetColumnIndex((*j)->GetName(), idx);
+      column_indexes.push_back(idx);
+    }
+    vector<Field> index_fields;
+    for(auto j=column_indexes.begin(); j != column_indexes.end(); j++){
+      index_fields.push_back(*(row.GetField(*j)));
+    }
+    Row index_row(index_fields);
+    (*i)->GetIndex()->InsertEntry(index_row, row.GetRowId(), NULL);
+  }
+
+  std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+  std::chrono::microseconds timeInterval = std::chrono::duration_cast <std::chrono::microseconds>(endTime - beginTime);
+  std::cout << "Time: " << timeInterval.count() << "us" << endl;
   return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteDelete(pSyntaxNode ast, ExecuteContext *context) {
+  std::chrono::high_resolution_clock::time_point beginTime = std::chrono::high_resolution_clock::now();
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteDelete" << std::endl;
 #endif
@@ -391,17 +550,56 @@ dberr_t ExecuteEngine::ExecuteDelete(pSyntaxNode ast, ExecuteContext *context) {
   db->catalog_mgr_->GetTable(table_name,table_info);
   NodePointer = NodePointer->next_;
   std::vector<RowId> res;
-  if(NodePointer!=NULL)res = Condition(NodePointer, table_name);
+  if(NodePointer!=NULL)res = Condition(NodePointer->child_, table_name);
+  else{
+    TableIterator Iterator = table_info->GetTableHeap()->Begin(NULL);
+    while(Iterator != table_info->GetTableHeap()->End()){
+      res.push_back(Iterator->GetRowId());
+      ++Iterator;
+      }
+  }
+
+  vector<IndexInfo*> index_infos;
+  db->catalog_mgr_->GetTableIndexes(table_name, index_infos);
+  vector<Row> rows;
+  for(auto i = res.begin(); i!= res.end(); i++){
+    Row *temp_row = new Row((*i));
+    table_info->GetTableHeap()->GetTuple(temp_row, NULL);
+    temp_row->SetRowId(*i);
+    rows.push_back(*temp_row);
+  }
+  for(auto i = index_infos.begin(); i != index_infos.end(); i++){
+    vector<Column*> key_columns = (*i)->GetIndexKeySchema()->GetColumns();
+    vector<uint32_t> column_indexes;
+    for(auto j = key_columns.begin(); j != key_columns.end();j++){
+      uint32_t idx;
+      (*i)->GetIndexKeySchema()->GetColumnIndex((*j)->GetName(), idx);
+      column_indexes.push_back(idx);
+    }
+    for(auto m = rows.begin(); m!= rows.end(); m++){
+      Row *row = new Row(*m);
+      vector<Field> index_fields;
+      table_info->GetTableHeap()->GetTuple(row, NULL);
+      row->SetRowId((*m).GetRowId());
+      for(auto j=column_indexes.begin(); j != column_indexes.end(); j++){
+        index_fields.push_back(*(row->GetField(*j)));
+      }
+      Row index_row(index_fields);
+      (*i)->GetIndex()->RemoveEntry(index_row, row->GetRowId(), NULL);
+    }
+    
+  }
+
   for(int i = 0; i < (int)res.size(); i++)table_info->GetTableHeap()->ApplyDelete(res[i], NULL);
-  IndexInfo* index_info = NULL;
-  db->catalog_mgr_->GetIndex(table_name, "PRIMARY", index_info);
-  //for(int i = 0; i < res.size(); i++){
-    //index_info->GetIndex()->RemoveEntry(key, res[i], NULL);
-  //}
+
+  std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+  std::chrono::microseconds timeInterval = std::chrono::duration_cast <std::chrono::microseconds>(endTime - beginTime);
+  std::cout << "Time: " << timeInterval.count() << "us" << endl;
   return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext *context) {
+  std::chrono::high_resolution_clock::time_point beginTime = std::chrono::high_resolution_clock::now();
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteUpdate" << std::endl;
 #endif
@@ -421,7 +619,14 @@ dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext *context) {
   }
   NodePointer = NodePointer->next_;
   std::vector<RowId> res;
-  if(NodePointer != NULL)res = Condition(NodePointer, table_name);
+  if(NodePointer != NULL)res = Condition(NodePointer->child_, table_name);
+  else{
+    TableIterator Iterator = table_info->GetTableHeap()->Begin(NULL);
+    while(Iterator != table_info->GetTableHeap()->End()){
+      res.push_back(Iterator->GetRowId());
+      ++Iterator;
+      }
+  }
   for(int i = 0; i < (int)res.size(); i++){
     Row *row = new Row(res[i]);
     table_info->GetTableHeap()->GetTuple(row, NULL);
@@ -438,6 +643,9 @@ dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext *context) {
     }
     table_info->GetTableHeap()->UpdateTuple(*row, res[i], NULL);
   }
+  std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+  std::chrono::microseconds timeInterval = std::chrono::duration_cast <std::chrono::microseconds>(endTime - beginTime);
+  std::cout << "Time: " << timeInterval.count() << "us" << endl;
   return DB_SUCCESS;
 }
 
@@ -463,12 +671,15 @@ dberr_t ExecuteEngine::ExecuteTrxRollback(pSyntaxNode ast, ExecuteContext *conte
 }
 
 dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context) {
+  std::chrono::high_resolution_clock::time_point beginTime = std::chrono::high_resolution_clock::now();
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteExecfile" << std::endl;
 #endif
   fstream file;
   pSyntaxNode NodePointer = ast;
   FILE *yyin;
+  TreeFileManagers syntax_tree_file_mgr("syntax_tree_");
+  [[maybe_unused]] uint32_t syntax_tree_id = 0;
   NodePointer = NodePointer->child_;
   const char* file_name = (const char*)NodePointer->val_;
   file.open(file_name, ios::in|ios::binary);
@@ -479,7 +690,6 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context)
   }
   while(!feof(yyin)){
     int i = 0;
-    char ch;
     char cmd[1024];
     while (cmd[i-1] != ';') {
       cmd[i++] = fgetc(yyin);
@@ -514,7 +724,7 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context)
 
     ExecuteContext context;
     Execute(MinisqlGetParserRootNode(), &context);
-    sleep(1);
+    //sleep(0.1);
 
     // clean memory after parse
     MinisqlParserFinish();
@@ -527,6 +737,9 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context)
       break;
     }
   }
+  std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+  std::chrono::microseconds timeInterval = std::chrono::duration_cast <std::chrono::microseconds>(endTime - beginTime);
+  std::cout << "Time: " << timeInterval.count() << "us" << endl;
   return DB_SUCCESS;
 }
 
@@ -553,6 +766,7 @@ std::vector<RowId> ExecuteEngine::Condition(pSyntaxNode ast, std::string table_n
       //取交集
       sort (Rows1.begin(),Rows1.end(), RowId_compare);
       sort (Rows2.begin(),Rows2.end(), RowId_compare);
+      res.resize(min(Rows1.size(), Rows2.size()));
       set_intersection(Rows1.begin(), Rows1.end(), Rows2.begin(), Rows2.end(), res.begin(), RowId_compare);
     }
     else if((std::string)ast->val_ == "or"){
@@ -563,12 +777,12 @@ std::vector<RowId> ExecuteEngine::Condition(pSyntaxNode ast, std::string table_n
       //取并集
       sort (Rows1.begin(),Rows1.end(), RowId_compare);
       sort (Rows2.begin(),Rows2.end(), RowId_compare);
+      res.resize(max(Rows1.size(), Rows2.size()));
       set_union(Rows1.begin(), Rows1.end(), Rows2.begin(), Rows2.end(), res.begin(), RowId_compare);
     }
   }
   else if(ast->type_ == kNodeCompareOperator){
     if((std::string)ast->val_ == "="){
-      std::vector<RowId> res;
       pointer = pointer->child_;
       std::string column_name = (std::string)pointer->val_;
       pointer = pointer->next_;
@@ -576,11 +790,41 @@ std::vector<RowId> ExecuteEngine::Condition(pSyntaxNode ast, std::string table_n
       db->catalog_mgr_->GetTable(table_name, table_info);
       uint32_t idx;
       table_info->GetSchema()->GetColumnIndex(column_name, idx);
+      TypeId type = table_info->GetSchema()->GetColumn(idx)->GetType();
+
+      //check for index
+      std::vector<IndexInfo*> indexes;
+      IndexInfo* chosen_index = NULL;
+      db->catalog_mgr_->GetTableIndexes(table_name, indexes);
+      for(auto i = indexes.begin(); i!=indexes.end(); i++){
+        std::vector<Column*> columns = (*i)->GetIndexKeySchema()->GetColumns();
+        for(auto j = columns.begin(); j != columns.end(); j++){
+          if((*j)->GetName() == column_name && columns.size() == 1)chosen_index = (*i);
+        }
+        if(chosen_index != NULL)break;
+      }
+      if(chosen_index != NULL){
+        std::vector<Field> fields;
+        if(type == kTypeChar)fields.push_back(Field(type, pointer->val_, ((std::string)pointer->val_).size(), 0));
+        else if(type == kTypeInt)fields.push_back(Field(type, atoi(pointer->val_)));
+        else if(type == kTypeFloat)fields.push_back(Field(type, (float)atof(pointer->val_)));
+        Row key(fields);
+        std::vector<RowId> result;
+        chosen_index->GetIndex()->ScanKey(key, result, NULL);
+        return result;
+      }
+      
       TableIterator Iterator = table_info->GetTableHeap()->Begin(NULL);
       TableIterator End = table_info->GetTableHeap()->End();
       while(Iterator != End){
-        if((string)(Iterator->GetField(idx)->GetData()) == (string)pointer->val_ )res.push_back(Iterator->GetRowId());
-        Iterator++;
+        Row* row = new Row(*Iterator);
+        table_info->GetTableHeap()->GetTuple(row, NULL);
+        if(type == kTypeFloat){
+          if(atof(row->GetField(idx)->GetData()) == atof(pointer->val_ ))res.push_back(Iterator->GetRowId());
+        }
+        else {if(strcmp(pointer->val_, row->GetField(idx)->GetData()) == 0)res.push_back(Iterator->GetRowId());}
+        ++Iterator;
+        delete row;
       }
     }
     else if((std::string)ast->val_ == "not"){
@@ -594,8 +838,11 @@ std::vector<RowId> ExecuteEngine::Condition(pSyntaxNode ast, std::string table_n
       TableIterator Iterator = table_info->GetTableHeap()->Begin(NULL);
       TableIterator End = table_info->GetTableHeap()->End();
       while(Iterator != End){
-        if((string)(Iterator->GetField(idx)->GetData()) != (string)pointer->val_ )res.push_back(Iterator->GetRowId());
-        Iterator++;
+        Row* row = new Row(*Iterator);
+        table_info->GetTableHeap()->GetTuple(row, NULL);
+        if(! row->GetField(idx)->IsNull())res.push_back(Iterator->GetRowId());
+        ++Iterator;
+        delete row;
       }
     }
     else if((std::string)ast->val_ == "is"){  //is NULL
@@ -609,8 +856,121 @@ std::vector<RowId> ExecuteEngine::Condition(pSyntaxNode ast, std::string table_n
       TableIterator Iterator = table_info->GetTableHeap()->Begin(NULL);
       TableIterator End = table_info->GetTableHeap()->End();
       while(Iterator != End){
+        Row* row = new Row(*Iterator);
+        table_info->GetTableHeap()->GetTuple(row, NULL);
         if(Iterator->GetField(idx)->IsNull())res.push_back(Iterator->GetRowId());
-        Iterator++;
+        ++Iterator;
+        delete row;
+      }
+    }
+    else if((std::string)ast->val_ == "<>"){
+      pointer = pointer->child_;
+      std::string column_name = (std::string)pointer->val_;
+      pointer = pointer->next_;
+      TableInfo *table_info = NULL;
+      db->catalog_mgr_->GetTable(table_name, table_info);
+      uint32_t idx;
+      table_info->GetSchema()->GetColumnIndex(column_name, idx);
+      TableIterator Iterator = table_info->GetTableHeap()->Begin(NULL);
+      TableIterator End = table_info->GetTableHeap()->End();
+      TypeId type = table_info->GetSchema()->GetColumn(idx)->GetType();
+      while(Iterator != End){
+        Row* row = new Row(*Iterator);
+        table_info->GetTableHeap()->GetTuple(row, NULL);
+        if(type == kTypeFloat){
+          if(atof(row->GetField(idx)->GetData()) != atof(pointer->val_ ))res.push_back(Iterator->GetRowId());
+        }
+        else {if(strcmp(pointer->val_, row->GetField(idx)->GetData()) != 0)res.push_back(Iterator->GetRowId());}
+        ++Iterator;
+        delete row;
+      }
+    }
+    else if((std::string)ast->val_ == ">"){
+      pointer = pointer->child_;
+      std::string column_name = (std::string)pointer->val_;
+      pointer = pointer->next_;
+      TableInfo *table_info = NULL;
+      db->catalog_mgr_->GetTable(table_name, table_info);
+      uint32_t idx;
+      table_info->GetSchema()->GetColumnIndex(column_name, idx);
+      TableIterator Iterator = table_info->GetTableHeap()->Begin(NULL);
+      TableIterator End = table_info->GetTableHeap()->End();
+      TypeId type = table_info->GetSchema()->GetColumn(idx)->GetType();
+      while(Iterator != End){
+        Row* row = new Row(*Iterator);
+        table_info->GetTableHeap()->GetTuple(row, NULL);
+        if(type == kTypeFloat){
+          if(atof(row->GetField(idx)->GetData()) > atof(pointer->val_ ))res.push_back(Iterator->GetRowId());
+        }
+        else {if(atoi(row->GetField(idx)->GetData()) > atoi(pointer->val_ ))res.push_back(Iterator->GetRowId());}
+        ++Iterator;
+        delete row;
+      }
+    }
+    else if((std::string)ast->val_ == "<"){
+      pointer = pointer->child_;
+      std::string column_name = (std::string)pointer->val_;
+      pointer = pointer->next_;
+      TableInfo *table_info = NULL;
+      db->catalog_mgr_->GetTable(table_name, table_info);
+      uint32_t idx;
+      table_info->GetSchema()->GetColumnIndex(column_name, idx);
+      TableIterator Iterator = table_info->GetTableHeap()->Begin(NULL);
+      TableIterator End = table_info->GetTableHeap()->End();
+      TypeId type = table_info->GetSchema()->GetColumn(idx)->GetType();
+      while(Iterator != End){
+        Row* row = new Row(*Iterator);
+        table_info->GetTableHeap()->GetTuple(row, NULL);
+        if(type == kTypeFloat){
+          if(atof(row->GetField(idx)->GetData()) < atof(pointer->val_ ))res.push_back(Iterator->GetRowId());
+        }
+        else {if(atoi(row->GetField(idx)->GetData()) < atoi(pointer->val_ ))res.push_back(Iterator->GetRowId());}
+        ++Iterator;
+        delete row;
+      }
+    }
+    else if((std::string)ast->val_ == ">="){
+      pointer = pointer->child_;
+      std::string column_name = (std::string)pointer->val_;
+      pointer = pointer->next_;
+      TableInfo *table_info = NULL;
+      db->catalog_mgr_->GetTable(table_name, table_info);
+      uint32_t idx;
+      table_info->GetSchema()->GetColumnIndex(column_name, idx);
+      TableIterator Iterator = table_info->GetTableHeap()->Begin(NULL);
+      TableIterator End = table_info->GetTableHeap()->End();
+      TypeId type = table_info->GetSchema()->GetColumn(idx)->GetType();
+      while(Iterator != End){
+        Row* row = new Row(*Iterator);
+        table_info->GetTableHeap()->GetTuple(row, NULL);
+        if(type == kTypeFloat){
+          if(atof(row->GetField(idx)->GetData()) >= atof(pointer->val_ ))res.push_back(Iterator->GetRowId());
+        }
+        else {if(atoi(row->GetField(idx)->GetData()) >= atoi(pointer->val_ ))res.push_back(Iterator->GetRowId());}
+        ++Iterator;
+        delete row;
+      }
+    }
+    else if((std::string)ast->val_ == "<="){
+      pointer = pointer->child_;
+      std::string column_name = (std::string)pointer->val_;
+      pointer = pointer->next_;
+      TableInfo *table_info = NULL;
+      db->catalog_mgr_->GetTable(table_name, table_info);
+      uint32_t idx;
+      table_info->GetSchema()->GetColumnIndex(column_name, idx);
+      TableIterator Iterator = table_info->GetTableHeap()->Begin(NULL);
+      TableIterator End = table_info->GetTableHeap()->End();
+      TypeId type = table_info->GetSchema()->GetColumn(idx)->GetType();
+      while(Iterator != End){
+        Row* row = new Row(*Iterator);
+        table_info->GetTableHeap()->GetTuple(row, NULL);
+        if(type == kTypeFloat){
+          if(atof(row->GetField(idx)->GetData()) <= atof(pointer->val_ ))res.push_back(Iterator->GetRowId());
+        }
+        else {if(atoi(row->GetField(idx)->GetData()) <= atoi(pointer->val_ ))res.push_back(Iterator->GetRowId());}
+        ++Iterator;
+        delete row;
       }
     }
   }
