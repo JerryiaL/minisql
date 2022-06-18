@@ -309,6 +309,7 @@ dberr_t CatalogManager::DropIndex(const string &table_name, const string &index_
       auto it_table_index = it_table->second.find(index_name);
       index_id_t drop_index_id = it_table_index->second;
 
+      //indexes_.find(drop_index_id)->second->GetIndex()->Destroy();
       delete indexes_.find(drop_index_id)->second;
       indexes_.erase(drop_index_id);
       it_table->second.erase(index_name);

@@ -9,7 +9,10 @@ int yyparse(void);
 FILE *yyin;
 #include "parser/minisql_lex.h"
 #include "parser/parser.h"
+<<<<<<< HEAD
 #define ENABLE_PARSER_DEBUG
+=======
+>>>>>>> 86666bf26fa278a4a582516718ee9ceafd1e177a
 }
 
 void InitGoogleLog(char *argv) {
