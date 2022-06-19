@@ -7,7 +7,7 @@
 #include <time.h>
 #include <chrono>
 #include <dirent.h>
-#include <sys/stat.h>
+#include <sys/stat.h> 　
 #include <sys/types.h> 
 
 void getAllDatabase(string path, vector<string>& files) 
@@ -22,13 +22,7 @@ void getAllDatabase(string path, vector<string>& files)
   int i = 0;
   while((dirp = readdir(dp)) != NULL){
     i++;
-    if (
-      (dirp->d_name[0] == '.' && dirp->d_name[1] == '\0') || 
-      (dirp->d_name[0] == '.' && dirp->d_name[1] == '.' && dirp->d_name[2] == '\0')
-    )
-      continue;
-    else 
-      files.push_back(dirp->d_name);
+    if(i > 2) files.push_back(dirp->d_name);
   }
 }
 
@@ -42,7 +36,8 @@ ExecuteEngine::ExecuteEngine()
 {
   vector<string> dbname;
   getAllDatabase("./database/", dbname);
-  for (size_t i = 0; i < dbname.size(); i++) {
+  for(int i = 0; i < dbname.size(); i++)
+  {
     DBStorageEngine * newdb = new DBStorageEngine("./database/"+dbname[i], false);
     dbs_.insert({dbname[i], newdb});
   }
