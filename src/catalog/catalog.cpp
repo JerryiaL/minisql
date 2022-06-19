@@ -128,7 +128,6 @@ dberr_t CatalogManager::CreateTable(const string &table_name, TableSchema *schem
     tp = tp->Create(buffer_pool_manager_, schema, txn, log_manager_, lock_manager_, heap_);
     
     page_id_t this_table_heap_page = tp->GetFirstPageId();
-    LOG(INFO) << "this_table_page:" << this_table_heap_page;
     TableMetadata *tm;
     tm = tm->Create(this_table_id, table_name, this_table_heap_page, schema, heap_);
     table_info = table_info->Create(heap_);
@@ -194,7 +193,7 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
       Schema *sm = ti->GetSchema();
       std::vector<uint32_t> this_key_map_;
 
-      for(int i = 0; i < index_keys.size(); i ++)
+      for(size_t i = 0; i < index_keys.size(); i ++)
       {
         uint32_t col_id;
         enum dberr_t flag = sm->GetColumnIndex(index_keys[i], col_id);

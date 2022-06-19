@@ -7,9 +7,14 @@
 #include <time.h>
 #include <chrono>
 #include <dirent.h>
-#include <sys/stat.h> 　
+#include <sys/stat.h>
 #include <sys/types.h> 
+extern "C" {
+int yyparse(void);
+#include "parser/minisql_lex.h"
+#include "parser/parser.h"
 
+}
 void getAllDatabase(string path, vector<string>& files) 
 {
   DIR *dp; //创建一个指向root路径下每个文件的指针
@@ -22,7 +27,13 @@ void getAllDatabase(string path, vector<string>& files)
   int i = 0;
   while((dirp = readdir(dp)) != NULL){
     i++;
-    if(i > 2) files.push_back(dirp->d_name);
+    if (
+      (dirp->d_name[0] == '.' && dirp->d_name[1] == '\0') || 
+      (dirp->d_name[0] == '.' && dirp->d_name[1] == '.' && dirp->d_name[2] == '\0')
+    )
+      continue;
+    else 
+      files.push_back(dirp->d_name);
   }
 }
 
@@ -36,13 +47,11 @@ ExecuteEngine::ExecuteEngine()
 {
   vector<string> dbname;
   getAllDatabase("./database/", dbname);
-  for(int i = 0; i < dbname.size(); i++)
-  {
+  for (size_t i = 0; i < dbname.size(); i++) {
     DBStorageEngine * newdb = new DBStorageEngine("./database/"+dbname[i], false);
     dbs_.insert({dbname[i], newdb});
   }
 }
-
 
 
 bool RowId_compare(RowId x, RowId y){
@@ -447,7 +456,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     db->catalog_mgr_->GetTable(table_name, table_info);
     if(table_info == NULL)
     {
-      cout<<"Error: No such table"<<endl;
+      cout << "table not exist" << endl;
       return DB_TABLE_NOT_EXIST;
     }
     uint32_t cnt = table_info->GetSchema()->GetColumnCount();
@@ -483,8 +492,8 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
       }
     
   }
-  LOG(INFO) << "ExecuteSelect check1 res.size = "<< res.size() << std::endl;
-  for(int i = 0; i < (int)res.size(); i++){
+  int i;
+  for(i = 0; i < (int)res.size(); i++){
     if(res[i].GetPageId() == -1)break;
     Row* row = new Row(res[i]);
     table_info->GetTableHeap()->GetTuple(row, NULL);
@@ -495,6 +504,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     }
     cout<<endl;
   }
+  cout<<"Selected Row Number : "<<i<<endl;
   std::chrono::high_resolution_clock::time_point endTime = std::chrono::high_resolution_clock::now();
   std::chrono::microseconds timeInterval = std::chrono::duration_cast <std::chrono::microseconds>(endTime - beginTime);
   std::cout << "Time: " << timeInterval.count() << "us" << endl;
@@ -511,11 +521,6 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
   std::string table_name = (std::string)NodePointer->val_;
   TableInfo *table_info = NULL;
   db->catalog_mgr_->GetTable(table_name,table_info);
-  if(table_info == NULL)
-  {
-    cout<<"Error: No such table"<<endl;
-    return DB_TABLE_NOT_EXIST;
-  }
   //LOG(INFO) << "ExecuteInsert check1" << std::endl;
   std::vector<Column*> columns = table_info->GetSchema()->GetColumns();
   //LOG(INFO) << "ExecuteInsert check0" << std::endl;
@@ -605,7 +610,7 @@ dberr_t ExecuteEngine::ExecuteDelete(pSyntaxNode ast, ExecuteContext *context) {
   db->catalog_mgr_->GetTable(table_name,table_info);
   if(table_info == NULL)
   {
-    cout<<"Error: No such table"<<endl;
+    cout << "table not exist" << endl;;
     return DB_TABLE_NOT_EXIST;
   }
   NodePointer = NodePointer->next_;
@@ -618,7 +623,7 @@ dberr_t ExecuteEngine::ExecuteDelete(pSyntaxNode ast, ExecuteContext *context) {
       ++Iterator;
       }
   }
-
+  cout<<"Deleted Row Num : "<<res.size()<<endl;
   vector<IndexInfo*> index_infos;
   db->catalog_mgr_->GetTableIndexes(table_name, index_infos);
   vector<Row> rows;
@@ -668,6 +673,11 @@ dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext *context) {
   std::string table_name = (std::string)NodePointer->val_;
   TableInfo *table_info = NULL;
   db->catalog_mgr_->GetTable(table_name,table_info);
+  if(table_info == NULL)
+  {
+    cout << "table not exist" << endl;
+    return DB_TABLE_NOT_EXIST;
+  }
   NodePointer = NodePointer->next_;
   pSyntaxNode ChildPointer = NodePointer->child_;
   std::vector<std::string> value_names;
@@ -687,6 +697,7 @@ dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext *context) {
       ++Iterator;
       }
   }
+  cout<<"Updated Row Num : "<<res.size()<<endl;
   for(int i = 0; i < (int)res.size(); i++){
     Row *row = new Row(res[i]);
     table_info->GetTableHeap()->GetTuple(row, NULL);
@@ -828,6 +839,9 @@ std::vector<RowId> ExecuteEngine::Condition(pSyntaxNode ast, std::string table_n
       sort (Rows2.begin(),Rows2.end(), RowId_compare);
       res.resize(min(Rows1.size(), Rows2.size()));
       set_intersection(Rows1.begin(), Rows1.end(), Rows2.begin(), Rows2.end(), res.begin(), RowId_compare);
+      int i = res.size()-1;
+      while(res[i].GetPageId() == -1)i--;
+      res.resize(i+1);
     }
     else if((std::string)ast->val_ == "or"){
       pointer = pointer->child_;
@@ -837,8 +851,11 @@ std::vector<RowId> ExecuteEngine::Condition(pSyntaxNode ast, std::string table_n
       //取并集
       sort (Rows1.begin(),Rows1.end(), RowId_compare);
       sort (Rows2.begin(),Rows2.end(), RowId_compare);
-      res.resize(max(Rows1.size(), Rows2.size()));
+      res.resize(Rows1.size()+Rows2.size());
       set_union(Rows1.begin(), Rows1.end(), Rows2.begin(), Rows2.end(), res.begin(), RowId_compare);
+      int i = res.size()-1;
+      while(res[i].GetPageId() == -1)i--;
+      res.resize(i+1);
     }
   }
   else if(ast->type_ == kNodeCompareOperator){
