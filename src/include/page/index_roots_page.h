@@ -31,6 +31,8 @@ public:
 
   int GetIndexCount() { return count_; }
 
+  void ClearInvalid();
+
 private:
   static constexpr int MAX_INDEX_COUNT = (PAGE_SIZE - 4) / 8;
 

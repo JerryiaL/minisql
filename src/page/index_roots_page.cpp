@@ -50,3 +50,17 @@ int IndexRootsPage::FindIndex(const index_id_t index_id) {
   }
   return -1;
 }
+
+void IndexRootsPage::ClearInvalid() {
+  std::pair<index_id_t, page_id_t> tmp_roots_[count_];
+  int tmp_count_ = 0;
+  for (auto i = 0; i < count_; i++) {
+    if (roots_[i].second != -1) {
+      tmp_roots_[tmp_count_++] = roots_[i];
+    }
+  }
+  for (auto i = 0; i < tmp_count_; i++) {
+    roots_[i] = tmp_roots_[i];
+  }
+  count_ = tmp_count_;
+}
