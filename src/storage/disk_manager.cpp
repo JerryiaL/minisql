@@ -45,10 +45,12 @@ void DiskManager::WritePage(page_id_t logical_page_id, const char *page_data) {
 
 page_id_t DiskManager::AllocatePage() {
   page_id_t logical_id = 0;
+  //get disk information from the meta_data_
   DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(meta_data_); 
   uint32_t extent_id = 0;
   for(uint32_t i = 0 ; i < MAX_EXTENT;i++){
     if(meta_page->extent_used_page_[i] < BITMAP_SIZE){
+      //record we get a new page from this extent
       meta_page->extent_used_page_[i]++;
       meta_page->num_allocated_pages_++;
       extent_id = i;
@@ -56,7 +58,7 @@ page_id_t DiskManager::AllocatePage() {
     }
   }meta_page->num_extents_ = extent_id+1;
   char temp_char[PAGE_SIZE];  
-  if(meta_page->extent_used_page_[extent_id] == 0){
+  if(meta_page->extent_used_page_[extent_id] == 0){//means this new extent don't have a bitmap
     //create a bitmap_page
     memset(temp_char, 0, PAGE_SIZE);
     WritePhysicalPage(extent_id*(BITMAP_SIZE+1)+1,temp_char);   
@@ -66,7 +68,6 @@ page_id_t DiskManager::AllocatePage() {
   BitmapPage<PAGE_SIZE> *bitmap_page = reinterpret_cast<BitmapPage<PAGE_SIZE> *>(temp_char);
   uint32_t index ;
   bitmap_page->AllocatePage(index);
-  //std::cout << "index = " << index << std::endl;
   logical_id = extent_id*BITMAP_SIZE + index;
   //write bitmap page
   memcpy(temp_char,bitmap_page,PAGE_SIZE);
@@ -78,14 +79,17 @@ page_id_t DiskManager::AllocatePage() {
 
 void DiskManager::DeAllocatePage(page_id_t logical_page_id) {
   page_id_t physical_page_id = MapPageId(logical_page_id);
+  //calculate the place of this page
   uint32_t extent_id = logical_page_id / BITMAP_SIZE ,index = logical_page_id % BITMAP_SIZE ;
   DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(meta_data_); 
   if(meta_page->extent_used_page_[extent_id] > 0){
+    //record one page will be moved from this extent
     meta_page->extent_used_page_[extent_id]-- ;
     meta_page->num_allocated_pages_--;    
   }else{
     return ;
   }
+  //make thiis page empty
   char page_data[PAGE_SIZE];
   memset(page_data, 0, PAGE_SIZE);
   WritePhysicalPage(physical_page_id,page_data);
@@ -104,7 +108,7 @@ void DiskManager::DeAllocatePage(page_id_t logical_page_id) {
 bool DiskManager::IsPageFree(page_id_t logical_page_id) {
   char page_data[PAGE_SIZE];
   uint32_t extent_id = logical_page_id / BITMAP_SIZE, index = logical_page_id % BITMAP_SIZE ;;
-  if(extent_id > MAX_EXTENT){
+  if(extent_id > MAX_EXTENT){//over range
     printf("Extent_nums: over the range ");
     return false;
   }

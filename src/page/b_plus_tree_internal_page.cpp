@@ -141,7 +141,7 @@ INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyNFrom(MappingType* items, int size, BufferPoolManager* buffer_pool_manager) {
   int curr_size = GetSize();
   IncreaseSize(size);
-
+  //add these items one by one after original pairs
   for (int i = 0; i < size; i++) {
     this->array_[curr_size + i].first = items[i].first;
     this->array_[curr_size + i].second = items[i].second;
@@ -149,6 +149,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyNFrom(MappingType* items, int size, Buf
     auto* page = buffer_pool_manager->FetchPage(page_id);
     if (page != nullptr) {
       auto* node = reinterpret_cast<BPlusTreePage*>(page->GetData());
+      //you need to update all the parent information of the items
       node->SetParentPageId(this->GetPageId());
       buffer_pool_manager->UnpinPage(page_id, true);
     }
@@ -217,7 +218,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllTo(BPlusTreeInternalPage* recipient,
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveFirstToEndOf(BPlusTreeInternalPage* recipient, const KeyType& middle_key,
   BufferPoolManager* buffer_pool_manager) {
-  SetKeyAt(0, middle_key);
+  SetKeyAt(0, middle_key);//change the middle key which is caused by the move
   recipient->CopyLastFrom(array_[0], buffer_pool_manager);
   Remove(0);
 }
@@ -251,7 +252,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyLastFrom(const MappingType& pair, Buffe
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveLastToFrontOf(BPlusTreeInternalPage* recipient, const KeyType& middle_key,
   BufferPoolManager* buffer_pool_manager) {
-  recipient->SetKeyAt(0, middle_key);
+  recipient->SetKeyAt(0, middle_key);//change the middle key which is caused by the move
   recipient->CopyFirstFrom(array_[GetSize() - 1], buffer_pool_manager);
   IncreaseSize(-1);
 }
@@ -269,14 +270,6 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyFirstFrom(const MappingType& pair, Buff
     array_[i].second = array_[i - 1].second;
   }
   array_[0].second = pair.second;
-  // //the key used to be invalid and now not
-  // page_id_t page_id = array_[1].second;
-  // auto* page = buffer_pool_manager->FetchPage(page_id);
-  // if (page != nullptr) {
-  //   auto* node = reinterpret_cast<BPlusTreeInternalPage*>(page->GetData());
-  //   array_[1].first = node->array_[1].first;
-  //   buffer_pool_manager->UnpinPage(page_id, true);
-  // }
   //'adopt' pair by changing its parent page id
   page_id_t page_id = pair.second;
   auto* page = buffer_pool_manager->FetchPage(page_id);

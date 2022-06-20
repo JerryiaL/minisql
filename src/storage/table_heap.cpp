@@ -2,19 +2,20 @@
 #include "glog/logging.h"
 
 bool TableHeap::InsertTuple(Row &row, Transaction *txn) {
-  page_id_t page_id = first_page_id_;
+  page_id_t page_id = first_page_id_;//start from the first page
   auto page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(page_id));
   if (page == nullptr) {
     return false;
   }
   page->WLatch();
+  //f record the result of the insert
   bool f = page->InsertTuple(row, schema_, txn, lock_manager_, log_manager_);
   page->WUnlatch();
   buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
   if (f == true) {
     return true;
   } else {
-    while (page->GetNextPageId() != -1) {
+    while (page->GetNextPageId() != -1) {//judge whether existed page have space to insert
       page_id = page->GetNextPageId();
       page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(page_id));
       if (page == nullptr) {
@@ -28,10 +29,13 @@ bool TableHeap::InsertTuple(Row &row, Transaction *txn) {
         return true;
       }
     }
+    //no space int all existed pages
     page_id_t pre_id = page_id;
+    // make a new page as next page
     page = reinterpret_cast<TablePage *>(buffer_pool_manager_->NewPage(page_id));
     page->Init(page_id, pre_id, log_manager_, txn);
     buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
+    //update the pre_page
     page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(pre_id));
     page->WLatch();
     page->SetNextPageId(page_id);
@@ -40,6 +44,7 @@ bool TableHeap::InsertTuple(Row &row, Transaction *txn) {
     if (page == nullptr) {
       return false;
     }
+    //insert the tuple into the new page
     page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(page_id));
     page->WLatch();
     f = page->InsertTuple(row, schema_, txn, lock_manager_, log_manager_);
@@ -65,6 +70,7 @@ bool TableHeap::MarkDelete(const RowId &rid, Transaction *txn) {
 }
 
 bool TableHeap::UpdateTuple(Row &row, const RowId &rid, Transaction *txn) {
+  //use rid to find the page of old record
   auto page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(rid.GetPageId()));
   if (page == nullptr) {
     return false;
@@ -74,13 +80,13 @@ bool TableHeap::UpdateTuple(Row &row, const RowId &rid, Transaction *txn) {
   UpdateTablePageStatus f = page->UpdateTuple(row, &old_row, schema_, txn, lock_manager_, log_manager_);
   page->WUnlatch();
   buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
-  if (f == UpdateTablePageStatus::completed)
+  if (f == UpdateTablePageStatus::completed)//update success
     return true;
-  else if(f == UpdateTablePageStatus::too_much_data){
+  else if(f == UpdateTablePageStatus::too_much_data){//new data is too much
     page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(rid.GetPageId()));
     page->WLatch();
-    page->ApplyDelete(rid,txn,log_manager_);
-    buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
+    page->ApplyDelete(rid,txn,log_manager_);//delete old record
+    buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);//insert new record
     return InsertTuple(row, txn);
   }
   else
