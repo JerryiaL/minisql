@@ -21,7 +21,6 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id, in
   SetParentPageId(parent_id);
   SetPageId(page_id);
   next_page_id_ = INVALID_PAGE_ID;
-  // NO NEED! array_ = new MappingType[max_size]; // use disk manager ???
 }
 
 /**
@@ -43,19 +42,18 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(const KeyType& key, const KeyComparator& comparator) const {
-  // for (int i = 0; i < GetMaxSize(); i++)
-  //   if (comparator(array_[i].first, key) >= 0)
-  //     return i;
-  // return 0;
-  int start = 0, end = GetSize();
+  /*
+  for (int i = 0; i < GetMaxSize(); i++)
+    if (comparator(array_[i].first, key) >= 0)
+      return i;
+  return 0;
+  */
+  int start = 0, end = GetSize(), mid;
   while (start < end) {
-    int mid = start + (end - start) / 2;
-    if (comparator(array_[mid].first, key) < 0) {
+    mid = start + (end - start) / 2;
+    if (comparator(array_[mid].first, key) < 0)
       start = mid + 1;
-    }
-    else {
-      end = mid;
-    }
+    else end = mid;
   }
   return start;
 }
@@ -101,7 +99,7 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType& key, const ValueType& valu
     return this->GetSize();
   }
 
-  for (int i = GetSize() - 1;i >= key_index; i--) {
+  for (int i = GetSize() - 1; i >= key_index; i--) {
     array_[i + 1].first = array_[i].first;
     array_[i + 1].second = array_[i].second;
   }
@@ -120,11 +118,6 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType& key, const ValueType& valu
   */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage* recipient) {
-  // recipient->IncreaseSize(GetSize() - GetMinSize());
-  // for (int i = GetMinSize(), j = 0; i < GetSize(); i++, j++) {
-  //   recipient->array_[j].first = this->array_[i].first;
-  //   recipient->array_[j].second = this->array_[i].second;
-  // }
   recipient->CopyNFrom(array_ + this->GetMinSize(), GetMaxSize() - GetMinSize());
   this->IncreaseSize(GetMinSize() - GetMaxSize());
 }
@@ -160,12 +153,9 @@ bool B_PLUS_TREE_LEAF_PAGE_TYPE::Lookup(const KeyType& key, ValueType& value, co
       value = array_[mid].second;
       return true;
     }
-    else if (comparator(key, array_[mid].first) < 0) {
+    else if (comparator(key, array_[mid].first) < 0)
       end = mid - 1;
-    }
-    else {
-      start = mid + 1;
-    }
+    else start = mid + 1;
   }
   return false;
 }
@@ -245,8 +235,6 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveLastToFrontOf(BPlusTreeLeafPage* recipient)
   recipient->CopyFirstFrom(array_[GetSize() - 1]);
   this->IncreaseSize(-1);
 }
-
-// 检查有没有覆盖问题
 
 /**
  * Insert item at the front of my items. Move items accordingly.

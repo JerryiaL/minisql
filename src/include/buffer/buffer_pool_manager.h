@@ -63,7 +63,6 @@ public:
 
   /**
    * @brief 将所有的页面都转储到磁盘中
-   * @warning Unused
    */
   bool FlushAllPages();
 
