@@ -1,5 +1,6 @@
 #include "catalog/catalog.h"
 
+// serialize map by writing map's size then map's every pair of key and value 
 template <class T, class V>
 uint32_t map_serialize(char *buf, std::map<T, V> mapA){
   uint32_t offset = 0;
@@ -17,6 +18,7 @@ uint32_t map_serialize(char *buf, std::map<T, V> mapA){
   return offset;
 }
 
+// deserialize map by first reading map's size then map's every pair of key and value 
 template <class T, class V>
 uint32_t map_deserialize(char *buf, std::map<T, V> &mapA){
   uint32_t offset = 0;
@@ -36,6 +38,7 @@ uint32_t map_deserialize(char *buf, std::map<T, V> &mapA){
   return offset;
 }
 
+//get map's serialize size 
 template <class T, class V>
 uint32_t map_get_serialize_size(std::map<T, V> mapA){
   uint32_t offset = 0;
@@ -48,7 +51,10 @@ uint32_t map_get_serialize_size(std::map<T, V> mapA){
 
 void CatalogMeta::SerializeTo(char *buf) const {
   uint32_t offset = 0;
+  // write magic num
   MACH_WRITE_TO(uint32_t, buf + offset, CATALOG_METADATA_MAGIC_NUM);
+
+  //write maps
   offset += sizeof(uint32_t);
   offset += map_serialize(buf + offset, table_meta_pages_);
   offset += map_serialize(buf + offset, index_meta_pages_);
@@ -56,14 +62,18 @@ void CatalogMeta::SerializeTo(char *buf) const {
 
 CatalogMeta *CatalogMeta::DeserializeFrom(char *buf, MemHeap *heap) {
   uint32_t offset = 0;
+  
+  //read magic num
   uint32_t tmp_magic_num = MACH_READ_FROM(uint32_t, buf + offset);
   offset += sizeof(uint32_t); 
   std::map<table_id_t, page_id_t> tmp_table_meta_pages_;
   std::map<index_id_t, page_id_t> tmp_index_meta_pages_;
 
+//deserialize maps
   offset += map_deserialize(buf + offset, tmp_table_meta_pages_);
   offset += map_deserialize(buf + offset, tmp_index_meta_pages_);
 
+  //create catalogmeta
   CatalogMeta* meta = NewInstance(heap);
   std::map<table_id_t, page_id_t> * tmpTableMeta = meta->GetTableMetaPages();
   *tmpTableMeta = tmp_table_meta_pages_;
@@ -193,7 +203,7 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
       Schema *sm = ti->GetSchema();
       std::vector<uint32_t> this_key_map_;
 
-      for(size_t i = 0; i < index_keys.size(); i ++)
+      for(int i = 0; i < index_keys.size(); i ++)
       {
         uint32_t col_id;
         enum dberr_t flag = sm->GetColumnIndex(index_keys[i], col_id);

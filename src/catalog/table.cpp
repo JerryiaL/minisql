@@ -1,24 +1,28 @@
 #include "catalog/table.h"
 
 uint32_t TableMetadata::SerializeTo(char *buf) const {
+  //write magic num
   uint32_t offset = 0;
   MACH_WRITE_TO(uint32_t, buf + offset, TABLE_METADATA_MAGIC_NUM);
   offset += sizeof(uint32_t);
 
+  //write table_id
   MACH_WRITE_TO(table_id_t, buf + offset, table_id_);
   offset += sizeof(table_id_t);
 
+  //write table_name
   MACH_WRITE_TO(uint32_t, buf + offset, table_name_.size());
   offset += sizeof(uint32_t);
-
   for(uint32_t i = 0; i < table_name_.size(); i++){
     MACH_WRITE_TO(char, buf + offset, table_name_[i]);
     offset += sizeof(char);
   }
 
+  //write page_id
   MACH_WRITE_TO(page_id_t, buf + offset, root_page_id_);
   offset += sizeof(page_id_t);
 
+  //write schema
   offset += schema_->SerializeTo(buf+offset);
 
   return offset;
@@ -34,13 +38,15 @@ uint32_t TableMetadata::GetSerializedSize() const {
  */
 uint32_t TableMetadata::DeserializeFrom(char *buf, TableMetadata *&table_meta, MemHeap *heap) {
   uint32_t offset = 0;
+  //read magic num
   uint32_t temp_magic_num = MACH_READ_FROM(uint32_t, buf + offset);
   offset += sizeof(uint32_t);
 
-  //table_meta = ALLOC_P(heap, TableMetadata);
+  //read table_id
   table_id_t temp_table_id_ = MACH_READ_FROM(table_id_t, buf + offset);
   offset += sizeof(table_id_t);
 
+  //read table_name
   uint32_t size = MACH_READ_FROM(uint32_t, buf+offset);
   offset += sizeof(uint32_t);
   std::string temp_table_name_;
@@ -49,9 +55,11 @@ uint32_t TableMetadata::DeserializeFrom(char *buf, TableMetadata *&table_meta, M
     offset += sizeof(char);
   }
 
+  //read page_id
   page_id_t temp_root_page_id_ = MACH_READ_FROM(page_id_t, buf + offset);
   offset += sizeof(page_id_t);
 
+  //read schema
   Schema *schema = nullptr;
   offset += schema->DeserializeFrom(buf + offset, schema, heap);
 
