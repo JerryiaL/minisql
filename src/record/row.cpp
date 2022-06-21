@@ -1,8 +1,8 @@
 #include "record/row.h"
 
 uint32_t Row::SerializeTo(char *buf, Schema *schema) const {
-  // should be magic num here?
   uint32_t count = GetFieldCount();
+  // offset record fixed length to write in buf
   uint32_t offset = 0;
 
   MACH_WRITE_TO(RowId, buf + offset, GetRowId());
@@ -10,14 +10,18 @@ uint32_t Row::SerializeTo(char *buf, Schema *schema) const {
 
   MACH_WRITE_TO(uint32_t, buf + offset, count);
   offset += sizeof(uint32_t);
+  
 
+  // offset_field record dynamic length to field write in buf
   uint32_t offset_field = 0;
   for(uint32_t i = 0; i < count; i++){
     Field* f = GetField(i);
+    // null must write the type
     if(f->IsNull())
     {
       MACH_WRITE_TO(bool, buf + offset + i, 1);
       const TypeId type_id = (*(schema->GetColumn(i))).GetType();
+      // tyep_id for length 4, I optimize it to a char(length 1) for each type
       if(type_id == kTypeInt)
       {
         MACH_WRITE_TO(char, buf + offset + count * sizeof(bool) + offset_field, '1');
@@ -61,9 +65,13 @@ uint32_t Row::DeserializeFrom(char *buf, Schema *schema) {
   fields_.clear();
 
   SetRowId(MACH_READ_FROM(RowId, buf + offset));
+
+  // offset record fixed length to read in buf
   offset += sizeof(RowId);
   uint32_t count = MACH_READ_FROM(uint32_t, buf + offset);
   offset += sizeof(uint32_t);
+
+  // offset_field record dynamic length to field write in buf
   uint32_t offset_field = 0;
   std::vector<Field* > tempfields;
   for(size_t i = 0; i < count; i++)
@@ -72,6 +80,7 @@ uint32_t Row::DeserializeFrom(char *buf, Schema *schema) {
     Field *tempf;
     char type = MACH_READ_FROM(char, buf + offset + count * sizeof(bool) + offset_field);
     TypeId this_type;
+    // one-to-one correspond from char to TypeId
     if(type == '1')
     {
       this_type = kTypeInt;
