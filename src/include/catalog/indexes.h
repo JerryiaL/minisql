@@ -71,15 +71,9 @@ public:
     this->meta_data_ = meta_data;
     this->table_info_ = table_info;
     // Step2: mapping index key to key schema
-    
-    /* Not sure*/
     key_schema_ = key_schema_->ShallowCopySchema(table_info_->GetSchema(), meta_data_->key_map_, heap_);
-    LOG(INFO) << "key_schema_shallow copy is ok";
-    LOG(INFO) << "shallow copy result:" << key_schema_->GetColumnCount();
     // Step3: call CreateIndex to create the index
     index_ = CreateIndex(buffer_pool_manager);
-    LOG(INFO) << "Create index is ok";
-    //ASSERT(false, "Not Implemented yet.");
   }
 
   inline Index *GetIndex() { return index_; }
@@ -97,11 +91,10 @@ private:
                          key_schema_{nullptr}, heap_(new SimpleMemHeap()) {}
 
   Index *CreateIndex(BufferPoolManager *buffer_pool_manager) {
-    /* not sure what to do
-     * just have a try 
-    */
     Index *ind = nullptr;
-    uint32_t index_total_len = 12; //for rowid and count
+    // fixed length to serialize row: rowid and count
+    uint32_t index_total_len = 12;
+    // max length to corresponding column
     for(uint32_t i = 0; i < key_schema_->GetColumnCount(); i++)
     {
       index_total_len += 1;
