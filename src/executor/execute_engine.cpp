@@ -45,7 +45,7 @@ int yyparse(void);
 }
 ExecuteEngine::ExecuteEngine() 
 {
-  //从文件中加载所有已存在的Database
+  //从文件夹中加载所有已存在的Database(即文件夹中所有文件)
   vector<string> dbname;
   getAllDatabase("./database/", dbname);
   for (size_t i = 0; i < dbname.size(); i++) {
